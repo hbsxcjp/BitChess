@@ -4,7 +4,7 @@
 int main()
 {
     initMask();
-    testMask();
+    testBoardMask();
 
     testFenPieChars();
 

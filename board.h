@@ -1,54 +1,62 @@
+#include <stdint.h>
 
 #define PLAYERNUM 2
 #define PIECEKINDNUM 7
+#define ALLPIECEKINDNUM (PLAYERNUM * PIECEKINDNUM)
 
 #define BOARDROWNUM 10
 #define BOARDCOLNUM 9
 #define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
 
-typedef __int128_t BitBoard;
+typedef __uint128_t Board;
 
-typedef enum Player
-{
-    RED,
-    BLACK
-} Player;
+// typedef enum Player
+// {
+//     RED,
+//     BLACK
+// } Player;
 
-typedef enum PieceKind
-{
-    KING,
-    ADVISOR,
-    BISHOP,
-    KNIGHT,
-    ROOK,
-    CANON,
-    PAWN,
-    ALLPIECE
-} PieceKind;
+// typedef enum Kind
+// {
+//     KING,
+//     ADVISOR,
+//     BISHOP,
+//     KNIGHT,
+//     ROOK,
+//     CANON,
+//     PAWN,
+//     ALLPIECE
+// } Kind;
 
-typedef struct PlayerPieceKind
-{
-    Player player;
-    PieceKind kind;
-} PlayerPieceKind;
+// typedef struct PlayerKind
+// {
+//     Player player;
+//     Kind kind;
+// } PlayerKind;
 
 typedef struct ChessPosition
 {
     // 当前走器
-    Player curPlayer;
+    // Player curPlayer;
+    int player;
 
-    BitBoard pieces[PLAYERNUM * PIECEKINDNUM];
+    // 基本局面
+    Board pieces[ALLPIECEKINDNUM];
+
+    // 计算中间存储数据(基本局面改动时更新)
 
 } ChessPosition;
 
-extern const char *FEN;
+// extern const Board* BoardMask;
+
+// extern const char *FEN;
 
 ChessPosition *setChessPosition(ChessPosition *chess, const char *fen);
 
 void initMask();
 
-void testMask();
+void testBoardMask();
 
 void testFenPieChars();
 
-void printChessPosition(const ChessPosition *chess);
+void testChessPosition();
