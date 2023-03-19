@@ -131,6 +131,20 @@ static int getNonZeroIndex(Board board)
     return index;
 }
 
+static int getNonZeroIndexs(int *indexs, Board board)
+{
+    int count = 0;
+    while (board >> BOARDOTHERSIZE)
+    {
+        int index = getNonZeroIndex(board);
+        board ^= BoardMask[index];
+
+        indexs[count++] = index;
+    }
+
+    return count;
+}
+
 void initMask()
 {
     for (int i = 0; i < BOARDLENGTH; ++i)
@@ -158,16 +172,13 @@ char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
 
+    int indexs[5]; // 每种棋子数量最多5枚
     for (int pkIndex = 0; pkIndex < ALLPIECEKINDNUM; ++pkIndex)
     {
         char ch = getPieceChar(pkIndex);
-        Board board = chess->pieces[pkIndex];
-        while (board >> BOARDOTHERSIZE)
-        {
-            int index = getNonZeroIndex(board);
-            pieChars[index] = ch;
-            board ^= BoardMask[index];
-        }
+        int count = getNonZeroIndexs(indexs, chess->pieces[pkIndex]);
+        for (int i = 0; i < count; ++i)
+            pieChars[indexs[i]] = ch;
     }
 
     pieChars[BOARDLENGTH] = EndChar;
