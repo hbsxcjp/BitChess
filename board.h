@@ -1,8 +1,7 @@
 #include <stdint.h>
 
-#define PLAYERNUM 2
-#define PIECEKINDNUM 7
-#define ALLPIECEKINDNUM (PLAYERNUM * PIECEKINDNUM)
+#define COLORNUM 2
+#define KINDNUM 7
 
 #define BOARDROWNUM 10
 #define BOARDCOLNUM 9
@@ -10,38 +9,37 @@
 
 typedef __uint128_t Board;
 
-// typedef enum Player
-// {
-//     RED,
-//     BLACK
-// } Player;
+typedef enum Color
+{
+    RED,
+    BLACK
+} Color;
 
-// typedef enum Kind
-// {
-//     KING,
-//     ADVISOR,
-//     BISHOP,
-//     KNIGHT,
-//     ROOK,
-//     CANON,
-//     PAWN,
-//     ALLPIECE
-// } Kind;
+typedef enum Kind
+{
+    KING,
+    ADVISOR,
+    BISHOP,
+    KNIGHT,
+    ROOK,
+    CANON,
+    PAWN
+} Kind;
 
-// typedef struct PlayerKind
-// {
-//     Player player;
-//     Kind kind;
-// } PlayerKind;
+typedef struct ColorKind
+{
+    Color color;
+    Kind kind;
+} ColorKind;
 
 typedef struct ChessPosition
 {
     // 当前走器
-    // Player curPlayer;
-    int player;
+    // Color curPlayer;
+    Color player;
 
     // 基本局面
-    Board pieces[ALLPIECEKINDNUM];
+    Board pieces[COLORNUM][KINDNUM];
 
     // 计算中间存储数据(基本局面改动时更新)
 
