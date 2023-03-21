@@ -1,4 +1,6 @@
-#include <stdint.h>
+
+#define BOARDBITSIZE 128
+#define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
 
 #define COLORNUM 2
 #define KINDNUM 7
@@ -7,51 +9,25 @@
 #define BOARDCOLNUM 9
 #define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
 
-typedef __uint128_t Board;
+typedef __uint128_t Board; // 只使用最高的90位
 
-typedef enum Color
-{
-    RED,
-    BLACK
-} Color;
+typedef enum Color Color;
 
-typedef enum Kind
-{
-    KING,
-    ADVISOR,
-    BISHOP,
-    KNIGHT,
-    ROOK,
-    CANON,
-    PAWN
-} Kind;
+typedef enum Kind Kind;
 
-typedef struct ColorKind
-{
-    Color color;
-    Kind kind;
-} ColorKind;
+typedef struct ColorKind ColorKind;
 
-typedef struct ChessPosition
-{
-    // 当前走器
-    // Color curPlayer;
-    Color player;
+typedef struct ChessPosition ChessPosition;
 
-    // 基本局面
-    Board pieces[COLORNUM][KINDNUM];
+extern const Board BoardMask[BOARDLENGTH];
 
-    // 计算中间存储数据(基本局面改动时更新)
+extern const char FEN[];
 
-} ChessPosition;
+ChessPosition *updateChessPositionData(ChessPosition *chess);
 
-// extern const Board* BoardMask;
+ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen);
 
-// extern const char *FEN;
-
-ChessPosition *setChessPosition(ChessPosition *chess, const char *fen);
-
-void initMask();
+char *setFenFromChessPosition(char *fen, const ChessPosition *chess);
 
 void testBoardMask();
 

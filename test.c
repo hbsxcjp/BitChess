@@ -1,14 +1,16 @@
 // #include <stdio.h>
 #include "board.h"
+#include "move.h"
 
 int main()
 {
-    initMask();
-    testBoardMask();
+    // testBoardMask();
 
-    testFenPieChars();
+    // testFenPieChars();
 
-    testChessPosition();
+    // testChessPosition();
+
+    initPieceMove();
 
     return 0;
 }

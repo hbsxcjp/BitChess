@@ -3,8 +3,6 @@
 #include <string.h>
 #include "board.h"
 
-#define BOARDBITSIZE 128
-#define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
 
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
 #define BYTEBINARY9(i)            \
@@ -18,15 +16,146 @@
         (((i)&0x02) ? '1' : '0'), \
         (((i)&0x01) ? '1' : '0')
 
+typedef enum Color
+{
+    RED,
+    BLACK,
+    ALLCOLOR
+} Color;
+
+typedef enum Kind
+{
+    KING,
+    ADVISOR,
+    BISHOP,
+    KNIGHT,
+    ROOK,
+    CANON,
+    PAWN
+} Kind;
+
+typedef struct ColorKind
+{
+    Color color;
+    Kind kind;
+} ColorKind;
+
+typedef struct ChessPosition
+{
+    // 当前
+    Color player;
+
+    // 基本局面
+    Board pieces[COLORNUM][KINDNUM];
+
+    // 计算中间存储数据(基本局面改动时更新)
+    Board colorPieces[COLORNUM + 1];
+
+} ChessPosition;
+
 const char NullChar = '_';
 const char SplitChar = '/';
 const char EndChar = '\x0';
 
 const int PieceNum[] = {1, 2, 2, 2, 2, 2, 5};
 const char *Chars[] = {"KABNRCP", "kabnrcp"};
+
 const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
 
-Board BoardMask[BOARDLENGTH];
+// 打印初始化器的内容
+// for (int i = 0; i < BOARDLENGTH; ++i)
+//     printf("(Board)1 << (BOARDBITSIZE - 1 - %d),\n", i);
+const Board BoardMask[BOARDLENGTH] = {
+    (Board)1 << (BOARDBITSIZE - 1 - 0),
+    (Board)1 << (BOARDBITSIZE - 1 - 1),
+    (Board)1 << (BOARDBITSIZE - 1 - 2),
+    (Board)1 << (BOARDBITSIZE - 1 - 3),
+    (Board)1 << (BOARDBITSIZE - 1 - 4),
+    (Board)1 << (BOARDBITSIZE - 1 - 5),
+    (Board)1 << (BOARDBITSIZE - 1 - 6),
+    (Board)1 << (BOARDBITSIZE - 1 - 7),
+    (Board)1 << (BOARDBITSIZE - 1 - 8),
+    (Board)1 << (BOARDBITSIZE - 1 - 9),
+    (Board)1 << (BOARDBITSIZE - 1 - 10),
+    (Board)1 << (BOARDBITSIZE - 1 - 11),
+    (Board)1 << (BOARDBITSIZE - 1 - 12),
+    (Board)1 << (BOARDBITSIZE - 1 - 13),
+    (Board)1 << (BOARDBITSIZE - 1 - 14),
+    (Board)1 << (BOARDBITSIZE - 1 - 15),
+    (Board)1 << (BOARDBITSIZE - 1 - 16),
+    (Board)1 << (BOARDBITSIZE - 1 - 17),
+    (Board)1 << (BOARDBITSIZE - 1 - 18),
+    (Board)1 << (BOARDBITSIZE - 1 - 19),
+    (Board)1 << (BOARDBITSIZE - 1 - 20),
+    (Board)1 << (BOARDBITSIZE - 1 - 21),
+    (Board)1 << (BOARDBITSIZE - 1 - 22),
+    (Board)1 << (BOARDBITSIZE - 1 - 23),
+    (Board)1 << (BOARDBITSIZE - 1 - 24),
+    (Board)1 << (BOARDBITSIZE - 1 - 25),
+    (Board)1 << (BOARDBITSIZE - 1 - 26),
+    (Board)1 << (BOARDBITSIZE - 1 - 27),
+    (Board)1 << (BOARDBITSIZE - 1 - 28),
+    (Board)1 << (BOARDBITSIZE - 1 - 29),
+    (Board)1 << (BOARDBITSIZE - 1 - 30),
+    (Board)1 << (BOARDBITSIZE - 1 - 31),
+    (Board)1 << (BOARDBITSIZE - 1 - 32),
+    (Board)1 << (BOARDBITSIZE - 1 - 33),
+    (Board)1 << (BOARDBITSIZE - 1 - 34),
+    (Board)1 << (BOARDBITSIZE - 1 - 35),
+    (Board)1 << (BOARDBITSIZE - 1 - 36),
+    (Board)1 << (BOARDBITSIZE - 1 - 37),
+    (Board)1 << (BOARDBITSIZE - 1 - 38),
+    (Board)1 << (BOARDBITSIZE - 1 - 39),
+    (Board)1 << (BOARDBITSIZE - 1 - 40),
+    (Board)1 << (BOARDBITSIZE - 1 - 41),
+    (Board)1 << (BOARDBITSIZE - 1 - 42),
+    (Board)1 << (BOARDBITSIZE - 1 - 43),
+    (Board)1 << (BOARDBITSIZE - 1 - 44),
+    (Board)1 << (BOARDBITSIZE - 1 - 45),
+    (Board)1 << (BOARDBITSIZE - 1 - 46),
+    (Board)1 << (BOARDBITSIZE - 1 - 47),
+    (Board)1 << (BOARDBITSIZE - 1 - 48),
+    (Board)1 << (BOARDBITSIZE - 1 - 49),
+    (Board)1 << (BOARDBITSIZE - 1 - 50),
+    (Board)1 << (BOARDBITSIZE - 1 - 51),
+    (Board)1 << (BOARDBITSIZE - 1 - 52),
+    (Board)1 << (BOARDBITSIZE - 1 - 53),
+    (Board)1 << (BOARDBITSIZE - 1 - 54),
+    (Board)1 << (BOARDBITSIZE - 1 - 55),
+    (Board)1 << (BOARDBITSIZE - 1 - 56),
+    (Board)1 << (BOARDBITSIZE - 1 - 57),
+    (Board)1 << (BOARDBITSIZE - 1 - 58),
+    (Board)1 << (BOARDBITSIZE - 1 - 59),
+    (Board)1 << (BOARDBITSIZE - 1 - 60),
+    (Board)1 << (BOARDBITSIZE - 1 - 61),
+    (Board)1 << (BOARDBITSIZE - 1 - 62),
+    (Board)1 << (BOARDBITSIZE - 1 - 63),
+    (Board)1 << (BOARDBITSIZE - 1 - 64),
+    (Board)1 << (BOARDBITSIZE - 1 - 65),
+    (Board)1 << (BOARDBITSIZE - 1 - 66),
+    (Board)1 << (BOARDBITSIZE - 1 - 67),
+    (Board)1 << (BOARDBITSIZE - 1 - 68),
+    (Board)1 << (BOARDBITSIZE - 1 - 69),
+    (Board)1 << (BOARDBITSIZE - 1 - 70),
+    (Board)1 << (BOARDBITSIZE - 1 - 71),
+    (Board)1 << (BOARDBITSIZE - 1 - 72),
+    (Board)1 << (BOARDBITSIZE - 1 - 73),
+    (Board)1 << (BOARDBITSIZE - 1 - 74),
+    (Board)1 << (BOARDBITSIZE - 1 - 75),
+    (Board)1 << (BOARDBITSIZE - 1 - 76),
+    (Board)1 << (BOARDBITSIZE - 1 - 77),
+    (Board)1 << (BOARDBITSIZE - 1 - 78),
+    (Board)1 << (BOARDBITSIZE - 1 - 79),
+    (Board)1 << (BOARDBITSIZE - 1 - 80),
+    (Board)1 << (BOARDBITSIZE - 1 - 81),
+    (Board)1 << (BOARDBITSIZE - 1 - 82),
+    (Board)1 << (BOARDBITSIZE - 1 - 83),
+    (Board)1 << (BOARDBITSIZE - 1 - 84),
+    (Board)1 << (BOARDBITSIZE - 1 - 85),
+    (Board)1 << (BOARDBITSIZE - 1 - 86),
+    (Board)1 << (BOARDBITSIZE - 1 - 87),
+    (Board)1 << (BOARDBITSIZE - 1 - 88),
+    (Board)1 << (BOARDBITSIZE - 1 - 89)};
 
 static inline char getPieceChar(ColorKind colorKind)
 {
@@ -90,54 +219,57 @@ static char *setFenFromPieChars(char *fen, const char *pieChars)
 // 求最高位非零位的序号，调用前判断参数非全零位
 static int getNonZeroIndex(Board board)
 {
-    int index = BOARDLENGTH - 1;
-    uint64_t value = (board >> BOARDOTHERSIZE) & 0X3FFFFFFUL; // 64-89 位
-    if (!value)
-    {
-        index = 63;
+    int index = 0;
+    __uint64_t value = board & 0XFFFFFFC000000000UL; // 64-89 位
+    if (value)
+        index = 64;
+    else
         value = board >> 64; // 00-63 位
-    }
 
-    if (!(value & 0XFFFFFFFFUL))
+    if (value & 0X00000000FFFFFFFFUL)
     {
-        index -= 32;
-        value >>= 32; // 00-31 位
+        index += 32;
+        value &= 0X00000000FFFFFFFFUL;
     }
 
-    if (!(value & 0XFFFF))
+    if (value & 0X0000FFFF0000FFFFUL)
     {
-        index -= 16;
-        value >>= 16;
+        index += 16;
+        value &= 0X0000FFFF0000FFFFUL;
     }
 
-    if (!(value & 0XFF))
+    if (value & 0X00FF00FF00FF00FFUL)
     {
-        index -= 8;
-        value >>= 8;
+        index += 8;
+        value &= 0X00FF00FF00FF00FFUL;
     }
 
-    if (!(value & 0XF))
+    if (value & 0X0F0F0F0F0F0F0F0FUL)
     {
-        index -= 4;
-        value >>= 4;
+        index += 4;
+        value &= 0X0F0F0F0F0F0F0F0FUL;
     }
 
-    if (!(value & 0X3))
+    if (value & 0X3333333333333333UL)
     {
-        index -= 2;
-        value >>= 2;
+        index += 2;
+        value &= 0X3333333333333333UL;
     }
 
-    if (!(value & 0X1))
-        index -= 1;
+    if (value & 0X5555555555555555UL)
+        index += 1;
 
     return index;
 }
 
-void initMask()
+ChessPosition *updateChessPositionData(ChessPosition *chess)
 {
-    for (int i = 0; i < BOARDLENGTH; ++i)
-        BoardMask[i] = (Board)1 << (BOARDBITSIZE - 1 - i);
+    for (Color color = RED; color <= BLACK; ++color)
+        for (Kind kind = KING; kind <= PAWN; ++kind)
+            chess->colorPieces[color] |= chess->pieces[color][kind];
+
+    chess->colorPieces[ALLCOLOR] = chess->colorPieces[RED] | chess->colorPieces[BLACK];
+    return chess;
 }
 
 ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen)
@@ -155,6 +287,7 @@ ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen)
         chess->pieces[colorKind.color][colorKind.kind] |= BoardMask[index];
     }
 
+    updateChessPositionData(chess);
     return chess;
 }
 
@@ -170,7 +303,7 @@ char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
         {
             char ch = getPieceChar((ColorKind){color, kind});
             Board board = chess->pieces[color][kind];
-            while (board >> BOARDOTHERSIZE)
+            while (board) // >> BOARDOTHERSIZE
             {
                 int index = getNonZeroIndex(board);
                 pieChars[index] = ch;
@@ -230,15 +363,16 @@ static char *getBoardStr(char *boardStr, const Board *boards, int length, int co
 
 static char *getChessPositionStr(char *chessStr, ChessPosition *chess)
 {
+    static const char *colorStrs[] = {"RED", "BLACK", "ALLCOLOR"};
     char temp[1024];
     strcpy(chessStr, "");
-    for (Color color = RED; color <= BLACK; ++color)
+    for (Color color = RED; color <= ALLCOLOR; ++color)
     {
-        snprintf(temp, 32, "color: %s\n", color == RED ? "RED" : "BLACK");
+        snprintf(temp, 32, "color: %s\n", colorStrs[color]);
         strcat(chessStr, temp);
 
         char boardStr[KINDNUM * (BOARDROWNUM + 2) * 16];
-        getBoardStr(boardStr, chess->pieces[color], KINDNUM, KINDNUM);
+        getBoardStr(boardStr, chess->pieces[color], color == ALLCOLOR ? COLORNUM + 1 : KINDNUM, KINDNUM);
         strcat(chessStr, boardStr);
     }
 
