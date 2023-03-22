@@ -19,15 +19,17 @@ typedef struct ColorKind ColorKind;
 
 typedef struct ChessPosition ChessPosition;
 
-extern const Board BoardMask[BOARDLENGTH];
-
 extern const char FEN[];
+
+extern const Board BoardMask[BOARDLENGTH];
 
 ChessPosition *updateChessPositionData(ChessPosition *chess);
 
 ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen);
 
 char *setFenFromChessPosition(char *fen, const ChessPosition *chess);
+
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum);
 
 void testBoardMask();
 

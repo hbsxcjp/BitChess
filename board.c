@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include "move.h"
 #include "board.h"
 
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
@@ -53,20 +54,16 @@ typedef struct ChessPosition
 } ChessPosition;
 
 const char NullChar = '_';
+
 const char SplitChar = '/';
+
 const char EndChar = '\x0';
 
 const int PieceNum[] = {1, 2, 2, 2, 2, 2, 5};
+
 const char *Chars[] = {"KABNRCP", "kabnrcp"};
 
 const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
-
-// 打印初始化器的内容
-void initBoardMask()
-{
-    for (int i = 0; i < BOARDLENGTH; ++i)
-        printf("(Board)1 << (BOARDBITSIZE - 1 - %d),\n", i);
-}
 
 const Board BoardMask[BOARDLENGTH] = {
     (Board)1 << (BOARDBITSIZE - 1 - 0),
@@ -306,7 +303,7 @@ char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
         {
             char ch = getPieceChar((ColorKind){color, kind});
             Board board = chess->pieces[color][kind];
-            while (board) // >> BOARDOTHERSIZE
+            while (board)
             {
                 int index = getNonZeroIndex(board);
                 pieChars[index] = ch;
@@ -319,7 +316,7 @@ char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
     return setFenFromPieChars(fen, pieChars);
 }
 
-static char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
 {
     if (length < colNum)
         colNum = length;
@@ -338,7 +335,7 @@ static char *getBoardStr(char *boardStr, const Board *boards, int length, int co
         strcpy(indexRowStr, "   ");
         for (int col = 0; col < colNum; ++col)
         {
-            snprintf(temp, 16, "%02d:       ", index + col);
+            snprintf(temp, 16, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
         }
         strcat(indexRowStr, "\n");
