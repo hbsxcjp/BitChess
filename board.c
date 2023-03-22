@@ -3,7 +3,6 @@
 #include <string.h>
 #include "board.h"
 
-
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
 #define BYTEBINARY9(i)            \
     (((i)&0x100) ? '1' : '0'),    \
@@ -63,8 +62,12 @@ const char *Chars[] = {"KABNRCP", "kabnrcp"};
 const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
 
 // 打印初始化器的内容
-// for (int i = 0; i < BOARDLENGTH; ++i)
-//     printf("(Board)1 << (BOARDBITSIZE - 1 - %d),\n", i);
+void initBoardMask()
+{
+    for (int i = 0; i < BOARDLENGTH; ++i)
+        printf("(Board)1 << (BOARDBITSIZE - 1 - %d),\n", i);
+}
+
 const Board BoardMask[BOARDLENGTH] = {
     (Board)1 << (BOARDBITSIZE - 1 - 0),
     (Board)1 << (BOARDBITSIZE - 1 - 1),

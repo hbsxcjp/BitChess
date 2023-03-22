@@ -17,8 +17,6 @@ typedef bool IsValid(int frow, int fcol);
 
 typedef int GetMoveTo(int toIndex[], int frow, int fcol);
 
-bool isValid(int frow, int fcol) { return true; } // 所有位置均有效
-
 static int getIndexFromSeat(Seat seat)
 {
     return seat.row * BOARDCOLNUM + seat.col;
@@ -224,6 +222,73 @@ static int getKnightMoveTo(int toIndex[], int frow, int fcol)
     return count;
 }
 
+static int getPawnMoveTo(int toIndex[], int frow, int fcol)
+{
+    int count = 0;
+    //           方向   W,   E,    S,    N
+    bool select[] = {true, true, true, true};
+    const Seat tseats[] = {
+        {frow, fcol - 1}, // W
+        {frow, fcol + 1}, // E
+        {frow - 1, fcol}, // S
+        {frow + 1, fcol}  // N
+    };
+    if (frow == 0)
+        select[2] = false;
+    else if (frow == 9)
+        select[3] = false;
+
+    if (fcol == 0)
+        select[0] = false;
+    else if (fcol == 8)
+        select[1] = false;
+
+    for (int i = 0; i < sizeof(tseats) / sizeof(tseats[0]); ++i)
+        if (select[i])
+            toIndex[count++] = getIndexFromSeat(tseats[i]);
+
+    return count;
+}
+
+void initPiecePut()
+{
+    IsValid *isValids[] = {
+        isValidKing,
+        isValidAdvisor,
+        isValidBishop,
+    };
+
+    char putStr[4096];
+    strcpy(putStr, "");
+    for (int i = 0; i < sizeof(isValids) / sizeof(isValids[0]); ++i)
+    {
+        char oneStr[64] = {}, allStr[4096];
+        snprintf(oneStr, 64, "\n// Piece Kind: %d\n", i);
+        strcpy(allStr, oneStr);
+        for (int row = 0; row < BOARDROWNUM; ++row)
+        {
+            for (int col = 0; col < BOARDCOLNUM; ++col)
+            {
+                if (isValids[i](row, col))
+                {
+                    snprintf(oneStr, 64, "(Board)1 << (BOARDBITSIZE - 1 - %d)|", getIndexFromSeat((Seat){row, col}));
+                    strcat(allStr, oneStr);
+                }
+            }
+        }
+        allStr[strlen(allStr) - 1] = ','; // 最后的'|'替换成‘,’
+        strcat(putStr, allStr);
+        strcat(putStr, "\n");
+    }
+
+    printf("{%s\n// Piece Kind: 3\n(Board)(-1),\n\n// Piece Kind: 4\n(Board)(-1),"
+           "\n\n// Piece Kind: 5\n(Board)(-1),\n\n// Piece Kind: 6\n(Board)(-1)\n}\n",
+           putStr);
+}
+
+// 所有位置均有效
+bool isValid(int frow, int fcol) { return true; }
+
 void initPieceMove()
 {
     IsValid *isValids[] = {
@@ -240,12 +305,14 @@ void initPieceMove()
         getAdvisorMoveTo,
         getBishopMoveTo,
         getKnightMoveTo,
+        getPawnMoveTo,
     };
     //
 
     printf("{");
-    for (int i = 0; i < 4; ++i) // KINDNUM
+    for (int i = 0; i < 5; ++i) // KINDNUM
     {
+        printf("\n// Piece Kind: %d\n", i);
         char moveStr[BOARDLENGTH * (BOARDCOLNUM + BOARDROWNUM) * 64];
         getPieceMoveStr(moveStr, isValids[i], getMoveTos[i]);
         printf(moveStr);
@@ -253,6 +320,22 @@ void initPieceMove()
 
     printf("}");
 }
+
+void testInitMoveStr()
+{
+    initPiecePut();
+
+    initPieceMove();
+}
+
+const Board PiecePut[KINDNUM] = {
+    (Board)1 << (BOARDBITSIZE - 1 - 3) | (Board)1 << (BOARDBITSIZE - 1 - 4) | (Board)1 << (BOARDBITSIZE - 1 - 5) | (Board)1 << (BOARDBITSIZE - 1 - 12) | (Board)1 << (BOARDBITSIZE - 1 - 13) | (Board)1 << (BOARDBITSIZE - 1 - 14) | (Board)1 << (BOARDBITSIZE - 1 - 21) | (Board)1 << (BOARDBITSIZE - 1 - 22) | (Board)1 << (BOARDBITSIZE - 1 - 23) | (Board)1 << (BOARDBITSIZE - 1 - 66) | (Board)1 << (BOARDBITSIZE - 1 - 67) | (Board)1 << (BOARDBITSIZE - 1 - 68) | (Board)1 << (BOARDBITSIZE - 1 - 75) | (Board)1 << (BOARDBITSIZE - 1 - 76) | (Board)1 << (BOARDBITSIZE - 1 - 77) | (Board)1 << (BOARDBITSIZE - 1 - 84) | (Board)1 << (BOARDBITSIZE - 1 - 85) | (Board)1 << (BOARDBITSIZE - 1 - 86),
+    (Board)1 << (BOARDBITSIZE - 1 - 3) | (Board)1 << (BOARDBITSIZE - 1 - 5) | (Board)1 << (BOARDBITSIZE - 1 - 13) | (Board)1 << (BOARDBITSIZE - 1 - 21) | (Board)1 << (BOARDBITSIZE - 1 - 23) | (Board)1 << (BOARDBITSIZE - 1 - 66) | (Board)1 << (BOARDBITSIZE - 1 - 68) | (Board)1 << (BOARDBITSIZE - 1 - 76) | (Board)1 << (BOARDBITSIZE - 1 - 84) | (Board)1 << (BOARDBITSIZE - 1 - 86),
+    (Board)1 << (BOARDBITSIZE - 1 - 2) | (Board)1 << (BOARDBITSIZE - 1 - 6) | (Board)1 << (BOARDBITSIZE - 1 - 18) | (Board)1 << (BOARDBITSIZE - 1 - 22) | (Board)1 << (BOARDBITSIZE - 1 - 26) | (Board)1 << (BOARDBITSIZE - 1 - 38) | (Board)1 << (BOARDBITSIZE - 1 - 42) | (Board)1 << (BOARDBITSIZE - 1 - 47) | (Board)1 << (BOARDBITSIZE - 1 - 51) | (Board)1 << (BOARDBITSIZE - 1 - 63) | (Board)1 << (BOARDBITSIZE - 1 - 67) | (Board)1 << (BOARDBITSIZE - 1 - 71) | (Board)1 << (BOARDBITSIZE - 1 - 83) | (Board)1 << (BOARDBITSIZE - 1 - 87),
+    (Board)(-1),
+    (Board)(-1),
+    (Board)(-1),
+    (Board)(-1)};
 
 const Board PieceMove[KINDNUM][BOARDLENGTH] = {
     {0,
