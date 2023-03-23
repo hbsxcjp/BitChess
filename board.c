@@ -1,8 +1,9 @@
-#include <stdio.h>
-#include <ctype.h>
-#include <string.h>
-#include "move.h"
 #include "board.h"
+#include "move.h"
+#include <ctype.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
 #define BYTEBINARY9(i)            \
@@ -16,15 +17,13 @@
         (((i)&0x02) ? '1' : '0'), \
         (((i)&0x01) ? '1' : '0')
 
-typedef enum Color
-{
+typedef enum Color {
     RED,
     BLACK,
     ALLCOLOR
 } Color;
 
-typedef enum Kind
-{
+typedef enum Kind {
     KING,
     ADVISOR,
     BISHOP,
@@ -34,14 +33,12 @@ typedef enum Kind
     PAWN
 } Kind;
 
-typedef struct ColorKind
-{
+typedef struct ColorKind {
     Color color;
     Kind kind;
 } ColorKind;
 
-typedef struct ChessPosition
-{
+typedef struct ChessPosition {
     // 当前
     Color player;
 
@@ -59,103 +56,104 @@ const char SplitChar = '/';
 
 const char EndChar = '\x0';
 
-const int PieceNum[] = {1, 2, 2, 2, 2, 2, 5};
+const int PieceNum[] = { 1, 2, 2, 2, 2, 2, 5 };
 
-const char *Chars[] = {"KABNRCP", "kabnrcp"};
+const char* Chars[] = { "KABNRCP", "kabnrcp" };
 
 const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
 
 const Board BoardMask[BOARDLENGTH] = {
-    (Board)1 << (BOARDBITSIZE - 1 - 0),
-    (Board)1 << (BOARDBITSIZE - 1 - 1),
-    (Board)1 << (BOARDBITSIZE - 1 - 2),
-    (Board)1 << (BOARDBITSIZE - 1 - 3),
-    (Board)1 << (BOARDBITSIZE - 1 - 4),
-    (Board)1 << (BOARDBITSIZE - 1 - 5),
-    (Board)1 << (BOARDBITSIZE - 1 - 6),
-    (Board)1 << (BOARDBITSIZE - 1 - 7),
-    (Board)1 << (BOARDBITSIZE - 1 - 8),
-    (Board)1 << (BOARDBITSIZE - 1 - 9),
-    (Board)1 << (BOARDBITSIZE - 1 - 10),
-    (Board)1 << (BOARDBITSIZE - 1 - 11),
-    (Board)1 << (BOARDBITSIZE - 1 - 12),
-    (Board)1 << (BOARDBITSIZE - 1 - 13),
-    (Board)1 << (BOARDBITSIZE - 1 - 14),
-    (Board)1 << (BOARDBITSIZE - 1 - 15),
-    (Board)1 << (BOARDBITSIZE - 1 - 16),
-    (Board)1 << (BOARDBITSIZE - 1 - 17),
-    (Board)1 << (BOARDBITSIZE - 1 - 18),
-    (Board)1 << (BOARDBITSIZE - 1 - 19),
-    (Board)1 << (BOARDBITSIZE - 1 - 20),
-    (Board)1 << (BOARDBITSIZE - 1 - 21),
-    (Board)1 << (BOARDBITSIZE - 1 - 22),
-    (Board)1 << (BOARDBITSIZE - 1 - 23),
-    (Board)1 << (BOARDBITSIZE - 1 - 24),
-    (Board)1 << (BOARDBITSIZE - 1 - 25),
-    (Board)1 << (BOARDBITSIZE - 1 - 26),
-    (Board)1 << (BOARDBITSIZE - 1 - 27),
-    (Board)1 << (BOARDBITSIZE - 1 - 28),
-    (Board)1 << (BOARDBITSIZE - 1 - 29),
-    (Board)1 << (BOARDBITSIZE - 1 - 30),
-    (Board)1 << (BOARDBITSIZE - 1 - 31),
-    (Board)1 << (BOARDBITSIZE - 1 - 32),
-    (Board)1 << (BOARDBITSIZE - 1 - 33),
-    (Board)1 << (BOARDBITSIZE - 1 - 34),
-    (Board)1 << (BOARDBITSIZE - 1 - 35),
-    (Board)1 << (BOARDBITSIZE - 1 - 36),
-    (Board)1 << (BOARDBITSIZE - 1 - 37),
-    (Board)1 << (BOARDBITSIZE - 1 - 38),
-    (Board)1 << (BOARDBITSIZE - 1 - 39),
-    (Board)1 << (BOARDBITSIZE - 1 - 40),
-    (Board)1 << (BOARDBITSIZE - 1 - 41),
-    (Board)1 << (BOARDBITSIZE - 1 - 42),
-    (Board)1 << (BOARDBITSIZE - 1 - 43),
-    (Board)1 << (BOARDBITSIZE - 1 - 44),
-    (Board)1 << (BOARDBITSIZE - 1 - 45),
-    (Board)1 << (BOARDBITSIZE - 1 - 46),
-    (Board)1 << (BOARDBITSIZE - 1 - 47),
-    (Board)1 << (BOARDBITSIZE - 1 - 48),
-    (Board)1 << (BOARDBITSIZE - 1 - 49),
-    (Board)1 << (BOARDBITSIZE - 1 - 50),
-    (Board)1 << (BOARDBITSIZE - 1 - 51),
-    (Board)1 << (BOARDBITSIZE - 1 - 52),
-    (Board)1 << (BOARDBITSIZE - 1 - 53),
-    (Board)1 << (BOARDBITSIZE - 1 - 54),
-    (Board)1 << (BOARDBITSIZE - 1 - 55),
-    (Board)1 << (BOARDBITSIZE - 1 - 56),
-    (Board)1 << (BOARDBITSIZE - 1 - 57),
-    (Board)1 << (BOARDBITSIZE - 1 - 58),
-    (Board)1 << (BOARDBITSIZE - 1 - 59),
-    (Board)1 << (BOARDBITSIZE - 1 - 60),
-    (Board)1 << (BOARDBITSIZE - 1 - 61),
-    (Board)1 << (BOARDBITSIZE - 1 - 62),
-    (Board)1 << (BOARDBITSIZE - 1 - 63),
-    (Board)1 << (BOARDBITSIZE - 1 - 64),
-    (Board)1 << (BOARDBITSIZE - 1 - 65),
-    (Board)1 << (BOARDBITSIZE - 1 - 66),
-    (Board)1 << (BOARDBITSIZE - 1 - 67),
-    (Board)1 << (BOARDBITSIZE - 1 - 68),
-    (Board)1 << (BOARDBITSIZE - 1 - 69),
-    (Board)1 << (BOARDBITSIZE - 1 - 70),
-    (Board)1 << (BOARDBITSIZE - 1 - 71),
-    (Board)1 << (BOARDBITSIZE - 1 - 72),
-    (Board)1 << (BOARDBITSIZE - 1 - 73),
-    (Board)1 << (BOARDBITSIZE - 1 - 74),
-    (Board)1 << (BOARDBITSIZE - 1 - 75),
-    (Board)1 << (BOARDBITSIZE - 1 - 76),
-    (Board)1 << (BOARDBITSIZE - 1 - 77),
-    (Board)1 << (BOARDBITSIZE - 1 - 78),
-    (Board)1 << (BOARDBITSIZE - 1 - 79),
-    (Board)1 << (BOARDBITSIZE - 1 - 80),
-    (Board)1 << (BOARDBITSIZE - 1 - 81),
-    (Board)1 << (BOARDBITSIZE - 1 - 82),
-    (Board)1 << (BOARDBITSIZE - 1 - 83),
-    (Board)1 << (BOARDBITSIZE - 1 - 84),
-    (Board)1 << (BOARDBITSIZE - 1 - 85),
-    (Board)1 << (BOARDBITSIZE - 1 - 86),
-    (Board)1 << (BOARDBITSIZE - 1 - 87),
-    (Board)1 << (BOARDBITSIZE - 1 - 88),
-    (Board)1 << (BOARDBITSIZE - 1 - 89)};
+    (Board)1 << (127 - 0),
+    (Board)1 << (127 - 1),
+    (Board)1 << (127 - 2),
+    (Board)1 << (127 - 3),
+    (Board)1 << (127 - 4),
+    (Board)1 << (127 - 5),
+    (Board)1 << (127 - 6),
+    (Board)1 << (127 - 7),
+    (Board)1 << (127 - 8),
+    (Board)1 << (127 - 9),
+    (Board)1 << (127 - 10),
+    (Board)1 << (127 - 11),
+    (Board)1 << (127 - 12),
+    (Board)1 << (127 - 13),
+    (Board)1 << (127 - 14),
+    (Board)1 << (127 - 15),
+    (Board)1 << (127 - 16),
+    (Board)1 << (127 - 17),
+    (Board)1 << (127 - 18),
+    (Board)1 << (127 - 19),
+    (Board)1 << (127 - 20),
+    (Board)1 << (127 - 21),
+    (Board)1 << (127 - 22),
+    (Board)1 << (127 - 23),
+    (Board)1 << (127 - 24),
+    (Board)1 << (127 - 25),
+    (Board)1 << (127 - 26),
+    (Board)1 << (127 - 27),
+    (Board)1 << (127 - 28),
+    (Board)1 << (127 - 29),
+    (Board)1 << (127 - 30),
+    (Board)1 << (127 - 31),
+    (Board)1 << (127 - 32),
+    (Board)1 << (127 - 33),
+    (Board)1 << (127 - 34),
+    (Board)1 << (127 - 35),
+    (Board)1 << (127 - 36),
+    (Board)1 << (127 - 37),
+    (Board)1 << (127 - 38),
+    (Board)1 << (127 - 39),
+    (Board)1 << (127 - 40),
+    (Board)1 << (127 - 41),
+    (Board)1 << (127 - 42),
+    (Board)1 << (127 - 43),
+    (Board)1 << (127 - 44),
+    (Board)1 << (127 - 45),
+    (Board)1 << (127 - 46),
+    (Board)1 << (127 - 47),
+    (Board)1 << (127 - 48),
+    (Board)1 << (127 - 49),
+    (Board)1 << (127 - 50),
+    (Board)1 << (127 - 51),
+    (Board)1 << (127 - 52),
+    (Board)1 << (127 - 53),
+    (Board)1 << (127 - 54),
+    (Board)1 << (127 - 55),
+    (Board)1 << (127 - 56),
+    (Board)1 << (127 - 57),
+    (Board)1 << (127 - 58),
+    (Board)1 << (127 - 59),
+    (Board)1 << (127 - 60),
+    (Board)1 << (127 - 61),
+    (Board)1 << (127 - 62),
+    (Board)1 << (127 - 63),
+    (Board)1 << (127 - 64),
+    (Board)1 << (127 - 65),
+    (Board)1 << (127 - 66),
+    (Board)1 << (127 - 67),
+    (Board)1 << (127 - 68),
+    (Board)1 << (127 - 69),
+    (Board)1 << (127 - 70),
+    (Board)1 << (127 - 71),
+    (Board)1 << (127 - 72),
+    (Board)1 << (127 - 73),
+    (Board)1 << (127 - 74),
+    (Board)1 << (127 - 75),
+    (Board)1 << (127 - 76),
+    (Board)1 << (127 - 77),
+    (Board)1 << (127 - 78),
+    (Board)1 << (127 - 79),
+    (Board)1 << (127 - 80),
+    (Board)1 << (127 - 81),
+    (Board)1 << (127 - 82),
+    (Board)1 << (127 - 83),
+    (Board)1 << (127 - 84),
+    (Board)1 << (127 - 85),
+    (Board)1 << (127 - 86),
+    (Board)1 << (127 - 87),
+    (Board)1 << (127 - 88),
+    (Board)1 << (127 - 89),
+};
 
 static inline char getPieceChar(ColorKind colorKind)
 {
@@ -166,14 +164,13 @@ static inline ColorKind getColorKind(char ch)
 {
     Color color = isupper(ch) ? RED : BLACK;
     Kind kind = strchr(Chars[color], ch) - Chars[color];
-    return (ColorKind){color, kind};
+    return (ColorKind) { color, kind };
 }
 
-static char *setPieCharsFromFen(char *pieChars, const char *fen)
+static char* setPieCharsFromFen(char* pieChars, const char* fen)
 {
     int len = strlen(fen);
-    for (int pieIndex = 0, fenIndex = 0; fenIndex < len && pieIndex < BOARDLENGTH; ++fenIndex)
-    {
+    for (int pieIndex = 0, fenIndex = 0; fenIndex < len && pieIndex < BOARDLENGTH; ++fenIndex) {
         char ch = fen[fenIndex];
         if (isdigit(ch))
             for (int j = ch - '0'; j > 0; --j)
@@ -186,24 +183,20 @@ static char *setPieCharsFromFen(char *pieChars, const char *fen)
     return pieChars;
 }
 
-static char *setFenFromPieChars(char *fen, const char *pieChars)
+static char* setFenFromPieChars(char* fen, const char* pieChars)
 {
     int index_F = 0;
-    for (int row = 0; row < BOARDROWNUM; ++row)
-    { // 从最高行开始
+    for (int row = 0; row < BOARDROWNUM; ++row) { // 从最高行开始
         int blankNum = 0;
-        for (int col = 0; col < BOARDCOLNUM; ++col)
-        {
+        for (int col = 0; col < BOARDCOLNUM; ++col) {
             int index_p = row * BOARDCOLNUM + col;
-            if (isalpha(pieChars[index_p]))
-            {
+            if (isalpha(pieChars[index_p])) {
                 if (blankNum > 0)
                     fen[index_F++] = '0' + blankNum;
 
                 fen[index_F++] = pieChars[index_p];
                 blankNum = 0;
-            }
-            else if (pieChars[index_p] == NullChar)
+            } else if (pieChars[index_p] == NullChar)
                 blankNum++;
         }
         if (blankNum > 0)
@@ -220,38 +213,33 @@ static char *setFenFromPieChars(char *fen, const char *pieChars)
 static int getNonZeroIndex(Board board)
 {
     int index = 0;
-    __uint64_t value = board & 0XFFFFFFC000000000UL; // 64-89 位
+    uint64_t value = board & 0XFFFFFFC000000000UL; // 64-89 位
     if (value)
         index = 64;
     else
         value = board >> 64; // 00-63 位
 
-    if (value & 0X00000000FFFFFFFFUL)
-    {
+    if (value & 0X00000000FFFFFFFFUL) {
         index += 32;
         value &= 0X00000000FFFFFFFFUL;
     }
 
-    if (value & 0X0000FFFF0000FFFFUL)
-    {
+    if (value & 0X0000FFFF0000FFFFUL) {
         index += 16;
         value &= 0X0000FFFF0000FFFFUL;
     }
 
-    if (value & 0X00FF00FF00FF00FFUL)
-    {
+    if (value & 0X00FF00FF00FF00FFUL) {
         index += 8;
         value &= 0X00FF00FF00FF00FFUL;
     }
 
-    if (value & 0X0F0F0F0F0F0F0F0FUL)
-    {
+    if (value & 0X0F0F0F0F0F0F0F0FUL) {
         index += 4;
         value &= 0X0F0F0F0F0F0F0F0FUL;
     }
 
-    if (value & 0X3333333333333333UL)
-    {
+    if (value & 0X3333333333333333UL) {
         index += 2;
         value &= 0X3333333333333333UL;
     }
@@ -262,7 +250,7 @@ static int getNonZeroIndex(Board board)
     return index;
 }
 
-ChessPosition *updateChessPositionData(ChessPosition *chess)
+ChessPosition* updateChessPositionData(ChessPosition* chess)
 {
     for (Color color = RED; color <= BLACK; ++color)
         for (Kind kind = KING; kind <= PAWN; ++kind)
@@ -272,13 +260,12 @@ ChessPosition *updateChessPositionData(ChessPosition *chess)
     return chess;
 }
 
-ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen)
+ChessPosition* setChessPositionFromFen(ChessPosition* chess, const char* fen)
 {
     char pieChars[BOARDLENGTH + 1] = {};
     setPieCharsFromFen(pieChars, fen);
 
-    for (int index = 0; index < BOARDLENGTH; ++index)
-    {
+    for (int index = 0; index < BOARDLENGTH; ++index) {
         char ch = pieChars[index];
         if (ch == NullChar)
             continue;
@@ -291,20 +278,17 @@ ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen)
     return chess;
 }
 
-char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
+char* setFenFromChessPosition(char* fen, const ChessPosition* chess)
 {
     char pieChars[BOARDLENGTH + 1];
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
 
-    for (Color color = RED; color <= BLACK; ++color)
-    {
-        for (Kind kind = KING; kind <= PAWN; ++kind)
-        {
-            char ch = getPieceChar((ColorKind){color, kind});
+    for (Color color = RED; color <= BLACK; ++color) {
+        for (Kind kind = KING; kind <= PAWN; ++kind) {
+            char ch = getPieceChar((ColorKind) { color, kind });
             Board board = chess->pieces[color][kind];
-            while (board)
-            {
+            while (board) {
                 int index = getNonZeroIndex(board);
                 pieChars[index] = ch;
                 board ^= BoardMask[index];
@@ -316,7 +300,7 @@ char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
     return setFenFromPieChars(fen, pieChars);
 }
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
+char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum)
 {
     if (length < colNum)
         colNum = length;
@@ -330,11 +314,9 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
     strcat(nullRowStr, "\n");
 
     strcpy(boardStr, "");
-    for (int index = 0; index < length; index += colNum)
-    {
+    for (int index = 0; index < length; index += colNum) {
         strcpy(indexRowStr, "   ");
-        for (int col = 0; col < colNum; ++col)
-        {
+        for (int col = 0; col < colNum; ++col) {
             snprintf(temp, 16, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
         }
@@ -342,13 +324,11 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
         strcat(boardStr, indexRowStr);
         strcat(boardStr, nullRowStr);
 
-        for (int row = 0; row < BOARDROWNUM; ++row)
-        {
+        for (int row = 0; row < BOARDROWNUM; ++row) {
             snprintf(temp, 16, "%d: ", row);
             strcat(boardStr, temp);
             int offset = BOARDOTHERSIZE + (BOARDROWNUM - 1 - row) * BOARDCOLNUM;
-            for (int col = 0; col < colNum; ++col)
-            {
+            for (int col = 0; col < colNum; ++col) {
                 int rowInt = (boards[index + col] >> offset) & 0x1FF;
                 snprintf(temp, 16, BINARYPATTERN9, BYTEBINARY9(rowInt));
                 strcat(boardStr, temp);
@@ -361,13 +341,12 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
     return boardStr;
 }
 
-static char *getChessPositionStr(char *chessStr, ChessPosition *chess)
+static char* getChessPositionStr(char* chessStr, ChessPosition* chess)
 {
-    static const char *colorStrs[] = {"RED", "BLACK", "ALLCOLOR"};
+    static const char* colorStrs[] = { "RED", "BLACK", "ALLCOLOR" };
     char temp[1024];
     strcpy(chessStr, "");
-    for (Color color = RED; color <= ALLCOLOR; ++color)
-    {
+    for (Color color = RED; color <= ALLCOLOR; ++color) {
         snprintf(temp, 32, "color: %s\n", colorStrs[color]);
         strcat(chessStr, temp);
 
@@ -379,14 +358,31 @@ static char *getChessPositionStr(char *chessStr, ChessPosition *chess)
     return chessStr;
 }
 
+// 打印初始化器的内容
+static void initBoardMaskStr()
+{
+    char maskStr[BOARDLENGTH * 64];
+    strcpy(maskStr, "const Board BoardMask[BOARDLENGTH] = {\n");
+    for (int i = 0; i < BOARDLENGTH; ++i) {
+        char oneStr[64];
+        snprintf(oneStr, 64, "(Board)1 << (127 - %d),\n", i);
+        strcat(maskStr, oneStr);
+    }
+
+    strcat(maskStr, "};\n");
+    printf(maskStr);
+}
+
 void testBoardMask()
 {
+    // initBoardMaskStr();
+
     char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
     getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM);
     printf("testBoardMask:\n%s\n", boardStr);
 }
 
-const char *fens[] = {
+const char* fens[] = {
     FEN,
     "5a3/4ak2r/6R2/8p/9/9/9/B4N2B/4K4/3c5",
     "2b1kab2/4a4/4c4/9/9/3R5/9/1C7/4r4/2BK2B2",
@@ -396,25 +392,23 @@ const char *fens[] = {
 void testFenPieChars()
 {
     printf("testFenPieChars:\n");
-    for (int i = 0; i < 4; ++i)
-    {
-        const char *afen = fens[i];
+    for (int i = 0; i < 4; ++i) {
+        const char* afen = fens[i];
         char pieChars[BOARDLENGTH + 1] = {};
         setPieCharsFromFen(pieChars, afen);
 
         char fen[BOARDLENGTH] = {};
         setFenFromPieChars(fen, pieChars);
         printf("PieChars: %s\nafen: %s\n fen: %s\n fen.Equal: %d\n\n",
-               pieChars, afen, fen, strcmp(fen, afen));
+            pieChars, afen, fen, strcmp(fen, afen));
     }
 }
 
 void testChessPosition()
 {
     printf("testChessPosition:\n");
-    for (int i = 0; i < 4; ++i)
-    {
-        const char *afen = fens[i];
+    for (int i = 0; i < 4; ++i) {
+        const char* afen = fens[i];
         ChessPosition chess = {};
         setChessPositionFromFen(&chess, afen);
 

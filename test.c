@@ -9,13 +9,13 @@
 
 int main()
 {
-    // testBoardMask();
+    testBoardMask();
 
     // testFenPieChars();
 
     // testChessPosition();
 
-    testInitMoveStr();
+    // testInitMoveStr();
 
     return 0;
 }

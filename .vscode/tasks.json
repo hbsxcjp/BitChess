@@ -4,14 +4,15 @@
 		{
 			"type": "cppbuild",
 			"label": "C/C++: gcc 生成活动文件",
-			"command": "/usr/bin/gcc",
+			"command": "C:\\msys64\\mingw64\\bin\\gcc.exe",
 			"args": [
 				"-fdiagnostics-color=always",
 				"-g",
-				"${workspaceFolder}/board.c",
-				"${file}",
+				"${workspaceFolder}/*.c",
+				// "${file}",
 				"-o",
-				"${fileDirname}/${fileBasenameNoExtension}"
+				"${fileDirname}/test.exe"
+				// "${fileDirname}/${fileBasenameNoExtension}"
 			],
 			"options": {
 				"cwd": "${fileDirname}"
@@ -20,7 +21,7 @@
 				"$gcc"
 			],
 			"group": "build",
-			"detail": "编译器: /usr/bin/gcc"
+			"detail": "编译器: C:\\msys64\\mingw64\\bin\\gcc.exe"
 		} 
 	]
 }

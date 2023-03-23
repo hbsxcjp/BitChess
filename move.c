@@ -682,13 +682,6 @@ const Board PieceMove[KINDNUM][BOARDLENGTH] = {
 };
 
 // 打印初始化器的内容
-void initBoardMask()
-{
-    for (int i = 0; i < BOARDLENGTH; ++i)
-        printf("(Board)1 << (BOARDBITSIZE - 1 - %d),\n", i);
-}
-
-// 打印初始化器的内容
 typedef bool IsValid(int frow, int fcol);
 
 typedef int GetMoveTo(int toIndex[], int frow, int fcol);
@@ -947,7 +940,7 @@ static int getPawnMoveTo(int toIndex[], int frow, int fcol)
     return count;
 }
 
-void initPiecePut()
+void initPiecePutStr()
 {
     IsValid* isValids[] = {
         isValidKing,
@@ -956,7 +949,7 @@ void initPiecePut()
     };
 
     char putStr[4096];
-    strcpy(putStr, "");
+    strcpy(putStr, "const Board PiecePut[KINDNUM] = {");
     for (int i = 0; i < sizeof(isValids) / sizeof(isValids[0]); ++i) {
         char oneStr[64] = {}, allStr[4096];
         snprintf(oneStr, 64, "\n// Piece Kind: %d\n", i);
@@ -974,12 +967,13 @@ void initPiecePut()
         strcat(putStr, "\n");
     }
 
-    printf("{%s\n// Piece Kind: 3\n(Board)(-1),\n\n// Piece Kind: 4\n(Board)(-1),"
-           "\n\n// Piece Kind: 5\n(Board)(-1),\n\n// Piece Kind: 6\n(Board)(-1)\n}\n",
-        putStr);
+    strcat(putStr, "\n// Piece Kind: 3\n(Board)(-1),\n\n// Piece Kind: 4\n(Board)(-1),"
+                   "\n\n// Piece Kind: 5\n(Board)(-1),\n\n// Piece Kind: 6\n(Board)(-1)\n};\n");
+
+    printf(putStr);
 }
 
-void initPieceMove()
+void initPieceMoveStr()
 {
     IsValid* isValids[] = {
         isValidKing,
@@ -1000,16 +994,19 @@ void initPieceMove()
         getPawnMoveTo,
     };
 
-    printf("{");
+    char aLLKindMoveStr[KINDNUM * BOARDLENGTH * (BOARDCOLNUM + BOARDROWNUM) * 64];
+    strcpy(aLLKindMoveStr, "const Board PieceMove[KINDNUM][BOARDLENGTH] = {");
     for (int i = 0; i < KINDNUM; ++i) //
     {
-        printf("\n// Piece Kind: %d\n", i);
-        char moveStr[BOARDLENGTH * (BOARDCOLNUM + BOARDROWNUM) * 64];
-        getPieceMoveStr(moveStr, isValids[i], getMoveTos[i]);
-        printf(moveStr);
+        char kindMoveStr[BOARDLENGTH * (BOARDCOLNUM + BOARDROWNUM) * 64];
+        snprintf(kindMoveStr, 64, "\n// Piece Kind: %d\n", i);
+        strcat(aLLKindMoveStr, kindMoveStr);
+        getPieceMoveStr(kindMoveStr, isValids[i], getMoveTos[i]);
+        strcat(aLLKindMoveStr, kindMoveStr);
     }
 
-    printf("}");
+    strcat(aLLKindMoveStr, "};\n");
+    printf(aLLKindMoveStr);
 }
 
 void printPieceMoveStr()
@@ -1027,8 +1024,8 @@ void printPieceMoveStr()
 
 void testInitMoveStr()
 {
-    // initPiecePut();
-    // initPieceMove();
+    // initPiecePutStr();
+    // initPieceMoveStr();
 
     printPieceMoveStr();
 }
