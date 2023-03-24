@@ -17,13 +17,15 @@
         (((i)&0x02) ? '1' : '0'), \
         (((i)&0x01) ? '1' : '0')
 
-typedef enum Color {
+typedef enum Color
+{
     RED,
     BLACK,
     ALLCOLOR
 } Color;
 
-typedef enum Kind {
+typedef enum Kind
+{
     KING,
     ADVISOR,
     BISHOP,
@@ -33,12 +35,14 @@ typedef enum Kind {
     PAWN
 } Kind;
 
-typedef struct ColorKind {
+typedef struct ColorKind
+{
     Color color;
     Kind kind;
 } ColorKind;
 
-typedef struct ChessPosition {
+typedef struct ChessPosition
+{
     // 当前
     Color player;
 
@@ -46,7 +50,7 @@ typedef struct ChessPosition {
     Board pieces[COLORNUM][KINDNUM];
 
     // 计算中间存储数据(基本局面改动时更新)
-    Board colorPieces[COLORNUM + 1];
+    Board colorPieces[COLORNUM];
 
 } ChessPosition;
 
@@ -56,9 +60,9 @@ const char SplitChar = '/';
 
 const char EndChar = '\x0';
 
-const int PieceNum[] = { 1, 2, 2, 2, 2, 2, 5 };
+const int PieceNum[] = {1, 2, 2, 2, 2, 2, 5};
 
-const char* Chars[] = { "KABNRCP", "kabnrcp" };
+const char *Chars[] = {"KABNRCP", "kabnrcp"};
 
 const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
 
@@ -164,13 +168,14 @@ static inline ColorKind getColorKind(char ch)
 {
     Color color = isupper(ch) ? RED : BLACK;
     Kind kind = strchr(Chars[color], ch) - Chars[color];
-    return (ColorKind) { color, kind };
+    return (ColorKind){color, kind};
 }
 
-static char* setPieCharsFromFen(char* pieChars, const char* fen)
+static char *setPieCharsFromFen(char *pieChars, const char *fen)
 {
     int len = strlen(fen);
-    for (int pieIndex = 0, fenIndex = 0; fenIndex < len && pieIndex < BOARDLENGTH; ++fenIndex) {
+    for (int pieIndex = 0, fenIndex = 0; fenIndex < len && pieIndex < BOARDLENGTH; ++fenIndex)
+    {
         char ch = fen[fenIndex];
         if (isdigit(ch))
             for (int j = ch - '0'; j > 0; --j)
@@ -183,20 +188,24 @@ static char* setPieCharsFromFen(char* pieChars, const char* fen)
     return pieChars;
 }
 
-static char* setFenFromPieChars(char* fen, const char* pieChars)
+static char *setFenFromPieChars(char *fen, const char *pieChars)
 {
     int index_F = 0;
-    for (int row = 0; row < BOARDROWNUM; ++row) { // 从最高行开始
+    for (int row = 0; row < BOARDROWNUM; ++row)
+    { // 从最高行开始
         int blankNum = 0;
-        for (int col = 0; col < BOARDCOLNUM; ++col) {
+        for (int col = 0; col < BOARDCOLNUM; ++col)
+        {
             int index_p = row * BOARDCOLNUM + col;
-            if (isalpha(pieChars[index_p])) {
+            if (isalpha(pieChars[index_p]))
+            {
                 if (blankNum > 0)
                     fen[index_F++] = '0' + blankNum;
 
                 fen[index_F++] = pieChars[index_p];
                 blankNum = 0;
-            } else if (pieChars[index_p] == NullChar)
+            }
+            else if (pieChars[index_p] == NullChar)
                 blankNum++;
         }
         if (blankNum > 0)
@@ -209,8 +218,54 @@ static char* setFenFromPieChars(char* fen, const char* pieChars)
     return fen;
 }
 
+// 求最低位非零位的序号，调用前判断参数非全零位
+static int getFrontNonZeroIndex(Board board)
+{
+    int index = BOARDBITSIZE - 1;
+    uint64_t value = board >> 64; // 00-63 位
+    if (value)
+        index -= 64;
+    else
+        value = board & 0XFFFFFFC000000000UL; // 64-89 位
+
+    if (value & 0XFFFFFFFF00000000UL)
+    {
+        index -= 32;
+        value &= 0XFFFFFFFF00000000UL;
+    }
+
+    if (value & 0XFFFF0000FFFF0000UL)
+    {
+        index -= 16;
+        value &= 0XFFFF0000FFFF0000UL;
+    }
+
+    if (value & 0XFF00FF00FF00FF00UL)
+    {
+        index -= 8;
+        value &= 0XFF00FF00FF00FF00UL;
+    }
+
+    if (value & 0XF0F0F0F0F0F0F0F0UL)
+    {
+        index -= 4;
+        value &= 0XF0F0F0F0F0F0F0F0UL;
+    }
+
+    if (value & 0XCCCCCCCCCCCCCCCCUL)
+    {
+        index -= 2;
+        value &= 0XCCCCCCCCCCCCCCCCUL;
+    }
+
+    if (value & 0XAAAAAAAAAAAAAAAAUL)
+        index -= 1;
+
+    return index;
+}
+
 // 求最高位非零位的序号，调用前判断参数非全零位
-static int getNonZeroIndex(Board board)
+static int getLastNonZeroIndex(Board board)
 {
     int index = 0;
     uint64_t value = board & 0XFFFFFFC000000000UL; // 64-89 位
@@ -219,27 +274,32 @@ static int getNonZeroIndex(Board board)
     else
         value = board >> 64; // 00-63 位
 
-    if (value & 0X00000000FFFFFFFFUL) {
+    if (value & 0X00000000FFFFFFFFUL)
+    {
         index += 32;
         value &= 0X00000000FFFFFFFFUL;
     }
 
-    if (value & 0X0000FFFF0000FFFFUL) {
+    if (value & 0X0000FFFF0000FFFFUL)
+    {
         index += 16;
         value &= 0X0000FFFF0000FFFFUL;
     }
 
-    if (value & 0X00FF00FF00FF00FFUL) {
+    if (value & 0X00FF00FF00FF00FFUL)
+    {
         index += 8;
         value &= 0X00FF00FF00FF00FFUL;
     }
 
-    if (value & 0X0F0F0F0F0F0F0F0FUL) {
+    if (value & 0X0F0F0F0F0F0F0F0FUL)
+    {
         index += 4;
         value &= 0X0F0F0F0F0F0F0F0FUL;
     }
 
-    if (value & 0X3333333333333333UL) {
+    if (value & 0X3333333333333333UL)
+    {
         index += 2;
         value &= 0X3333333333333333UL;
     }
@@ -250,22 +310,13 @@ static int getNonZeroIndex(Board board)
     return index;
 }
 
-ChessPosition* updateChessPositionData(ChessPosition* chess)
-{
-    for (Color color = RED; color <= BLACK; ++color)
-        for (Kind kind = KING; kind <= PAWN; ++kind)
-            chess->colorPieces[color] |= chess->pieces[color][kind];
-
-    chess->colorPieces[ALLCOLOR] = chess->colorPieces[RED] | chess->colorPieces[BLACK];
-    return chess;
-}
-
-ChessPosition* setChessPositionFromFen(ChessPosition* chess, const char* fen)
+ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen)
 {
     char pieChars[BOARDLENGTH + 1] = {};
     setPieCharsFromFen(pieChars, fen);
 
-    for (int index = 0; index < BOARDLENGTH; ++index) {
+    for (int index = 0; index < BOARDLENGTH; ++index)
+    {
         char ch = pieChars[index];
         if (ch == NullChar)
             continue;
@@ -274,22 +325,32 @@ ChessPosition* setChessPositionFromFen(ChessPosition* chess, const char* fen)
         chess->pieces[colorKind.color][colorKind.kind] |= BoardMask[index];
     }
 
-    updateChessPositionData(chess);
+    // 设置分颜色棋盘
+    for (Color color = RED; color <= BLACK; ++color)
+        for (Kind kind = KING; kind <= PAWN; ++kind)
+            chess->colorPieces[color] |= chess->pieces[color][kind];
+
     return chess;
 }
 
-char* setFenFromChessPosition(char* fen, const ChessPosition* chess)
+char *setFenFromChessPosition(char *fen, const ChessPosition *chess)
 {
     char pieChars[BOARDLENGTH + 1];
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
 
-    for (Color color = RED; color <= BLACK; ++color) {
-        for (Kind kind = KING; kind <= PAWN; ++kind) {
-            char ch = getPieceChar((ColorKind) { color, kind });
+    for (Color color = RED; color <= BLACK; ++color)
+    {
+        int (*getNonZeroIndex)(Board) = color == RED ? getLastNonZeroIndex : getFrontNonZeroIndex;
+        for (Kind kind = KING; kind <= PAWN; ++kind)
+        {
+            char ch = getPieceChar((ColorKind){color, kind});
             Board board = chess->pieces[color][kind];
-            while (board) {
+            while (board)
+            {
                 int index = getNonZeroIndex(board);
+                // int index = getFrontNonZeroIndex(board);
+                // int index = getLastNonZeroIndex(board);
                 pieChars[index] = ch;
                 board ^= BoardMask[index];
             }
@@ -300,7 +361,23 @@ char* setFenFromChessPosition(char* fen, const ChessPosition* chess)
     return setFenFromPieChars(fen, pieChars);
 }
 
-char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum)
+ChessPosition *doMoveChessPosition(ChessPosition *chess, Color color, Kind kind, int fromIndex, int toIndex)
+{
+    chess->player = !chess->player;
+
+    Board moveBoard = BoardMask[fromIndex] | BoardMask[toIndex];
+    chess->colorPieces[color] ^= moveBoard;
+    chess->pieces[color][kind] ^= moveBoard; // 清除原位置，置位新位置
+
+    Color toColor = !color;
+    chess->colorPieces[toColor] ^= BoardMask[toIndex];
+    for (Kind toKind = KING; toKind <= PAWN; ++toKind)
+        chess->pieces[toColor][toKind] ^= BoardMask[toIndex]; // 清除新位置
+
+    return chess;
+}
+
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
 {
     if (length < colNum)
         colNum = length;
@@ -314,9 +391,11 @@ char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum)
     strcat(nullRowStr, "\n");
 
     strcpy(boardStr, "");
-    for (int index = 0; index < length; index += colNum) {
+    for (int index = 0; index < length; index += colNum)
+    {
         strcpy(indexRowStr, "   ");
-        for (int col = 0; col < colNum; ++col) {
+        for (int col = 0; col < colNum; ++col)
+        {
             snprintf(temp, 16, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
         }
@@ -324,11 +403,13 @@ char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum)
         strcat(boardStr, indexRowStr);
         strcat(boardStr, nullRowStr);
 
-        for (int row = 0; row < BOARDROWNUM; ++row) {
+        for (int row = 0; row < BOARDROWNUM; ++row)
+        {
             snprintf(temp, 16, "%d: ", row);
             strcat(boardStr, temp);
             int offset = BOARDOTHERSIZE + (BOARDROWNUM - 1 - row) * BOARDCOLNUM;
-            for (int col = 0; col < colNum; ++col) {
+            for (int col = 0; col < colNum; ++col)
+            {
                 int rowInt = (boards[index + col] >> offset) & 0x1FF;
                 snprintf(temp, 16, BINARYPATTERN9, BYTEBINARY9(rowInt));
                 strcat(boardStr, temp);
@@ -341,17 +422,18 @@ char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum)
     return boardStr;
 }
 
-static char* getChessPositionStr(char* chessStr, ChessPosition* chess)
+static char *getChessPositionStr(char *chessStr, ChessPosition *chess)
 {
-    static const char* colorStrs[] = { "RED", "BLACK", "ALLCOLOR" };
+    static const char *colorStrs[] = {"RED", "BLACK", "ALLCOLOR"};
     char temp[1024];
     strcpy(chessStr, "");
-    for (Color color = RED; color <= ALLCOLOR; ++color) {
+    for (Color color = RED; color <= ALLCOLOR; ++color)
+    {
         snprintf(temp, 32, "color: %s\n", colorStrs[color]);
         strcat(chessStr, temp);
 
         char boardStr[KINDNUM * (BOARDROWNUM + 2) * 16];
-        getBoardStr(boardStr, chess->pieces[color], color == ALLCOLOR ? COLORNUM + 1 : KINDNUM, KINDNUM);
+        getBoardStr(boardStr, chess->pieces[color], color == ALLCOLOR ? COLORNUM : KINDNUM, KINDNUM);
         strcat(chessStr, boardStr);
     }
 
@@ -359,11 +441,12 @@ static char* getChessPositionStr(char* chessStr, ChessPosition* chess)
 }
 
 // 打印初始化器的内容
-static void initBoardMaskStr()
+void initBoardMaskStr()
 {
     char maskStr[BOARDLENGTH * 64];
     strcpy(maskStr, "const Board BoardMask[BOARDLENGTH] = {\n");
-    for (int i = 0; i < BOARDLENGTH; ++i) {
+    for (int i = 0; i < BOARDLENGTH; ++i)
+    {
         char oneStr[64];
         snprintf(oneStr, 64, "(Board)1 << (127 - %d),\n", i);
         strcat(maskStr, oneStr);
@@ -373,16 +456,21 @@ static void initBoardMaskStr()
     printf(maskStr);
 }
 
-void testBoardMask()
+void printBoardMask()
 {
-    // initBoardMaskStr();
-
     char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
     getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM);
     printf("testBoardMask:\n%s\n", boardStr);
 }
 
-const char* fens[] = {
+void testBoardMask()
+{
+    // initBoardMaskStr();
+
+    printBoardMask();
+}
+
+const char *fens[] = {
     FEN,
     "5a3/4ak2r/6R2/8p/9/9/9/B4N2B/4K4/3c5",
     "2b1kab2/4a4/4c4/9/9/3R5/9/1C7/4r4/2BK2B2",
@@ -392,23 +480,25 @@ const char* fens[] = {
 void testFenPieChars()
 {
     printf("testFenPieChars:\n");
-    for (int i = 0; i < 4; ++i) {
-        const char* afen = fens[i];
+    for (int i = 0; i < 4; ++i)
+    {
+        const char *afen = fens[i];
         char pieChars[BOARDLENGTH + 1] = {};
         setPieCharsFromFen(pieChars, afen);
 
         char fen[BOARDLENGTH] = {};
         setFenFromPieChars(fen, pieChars);
         printf("PieChars: %s\nafen: %s\n fen: %s\n fen.Equal: %d\n\n",
-            pieChars, afen, fen, strcmp(fen, afen));
+               pieChars, afen, fen, strcmp(fen, afen));
     }
 }
 
 void testChessPosition()
 {
     printf("testChessPosition:\n");
-    for (int i = 0; i < 4; ++i) {
-        const char* afen = fens[i];
+    for (int i = 0; i < 4; ++i)
+    {
+        const char *afen = fens[i];
         ChessPosition chess = {};
         setChessPositionFromFen(&chess, afen);
 

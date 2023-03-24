@@ -1009,7 +1009,7 @@ void initPieceMoveStr()
     printf(aLLKindMoveStr);
 }
 
-void printPieceMoveStr()
+void printPiecePutMoveStr()
 {
     char boardStr[KINDNUM * (BOARDROWNUM + 2) * 16];
     getBoardStr(boardStr, PiecePut, KINDNUM, KINDNUM);
@@ -1027,5 +1027,5 @@ void testInitMoveStr()
     // initPiecePutStr();
     // initPieceMoveStr();
 
-    printPieceMoveStr();
+    printPiecePutMoveStr();
 }

@@ -9,13 +9,15 @@
 
 int main()
 {
-    testBoardMask();
+    // Test board.c
+    // testBoardMask();
 
     // testFenPieChars();
 
     // testChessPosition();
 
-    // testInitMoveStr();
+    // Test move.c
+    testInitMoveStr();
 
     return 0;
 }
