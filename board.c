@@ -5,18 +5,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
-#define BYTEBINARY9(i)            \
-    (((i)&0x100) ? '1' : '0'),    \
-        (((i)&0x80) ? '1' : '0'), \
-        (((i)&0x40) ? '1' : '0'), \
-        (((i)&0x20) ? '1' : '0'), \
-        (((i)&0x10) ? '1' : '0'), \
-        (((i)&0x08) ? '1' : '0'), \
-        (((i)&0x04) ? '1' : '0'), \
-        (((i)&0x02) ? '1' : '0'), \
-        (((i)&0x01) ? '1' : '0')
-
 typedef enum Color {
     RED,
     BLACK,
@@ -55,8 +43,6 @@ const char NullChar = '_';
 const char SplitChar = '/';
 
 const char EndChar = '\x0';
-
-const int PieceNum[] = { 1, 2, 2, 2, 2, 2, 5 };
 
 const char* Chars[] = { "KABNRCP", "kabnrcp" };
 
@@ -365,7 +351,7 @@ static void initBoardMaskStr()
     strcpy(maskStr, "const Board BoardMask[BOARDLENGTH] = {\n");
     for (int i = 0; i < BOARDLENGTH; ++i) {
         char oneStr[64];
-        snprintf(oneStr, 64, "(Board)1 << (127 - %d),\n", i);
+        snprintf(oneStr, 64, "BOARDAT(%d),\n", i);
         strcat(maskStr, oneStr);
     }
 
@@ -375,11 +361,11 @@ static void initBoardMaskStr()
 
 void testBoardMask()
 {
-    // initBoardMaskStr();
+    initBoardMaskStr();
 
-    char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
-    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM);
-    printf("testBoardMask:\n%s\n", boardStr);
+    // char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
+    // getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM);
+    // printf("testBoardMask:\n%s\n", boardStr);
 }
 
 const char* fens[] = {
