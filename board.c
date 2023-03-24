@@ -448,7 +448,7 @@ void initBoardMaskStr()
     for (int i = 0; i < BOARDLENGTH; ++i)
     {
         char oneStr[64];
-        snprintf(oneStr, 64, "(Board)1 << (127 - %d),\n", i);
+        snprintf(oneStr, 64, "BOARDAT(%d),\n", i);
         strcat(maskStr, oneStr);
     }
 
