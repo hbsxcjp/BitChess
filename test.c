@@ -1,4 +1,7 @@
-// #include <stdio.h>
+#include <ctype.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 #include "move.h"
 #include "board.h"
 
@@ -9,15 +12,13 @@
 
 int main()
 {
+    // Test getData.c
+    // testGenData();
+
     // Test board.c
-    // testBoardMask();
-
-    // testFenPieChars();
-
-    // testChessPosition();
+    testChessPosition();
 
     // Test move.c
-    testInitMoveStr();
 
     return 0;
 }

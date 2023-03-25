@@ -1,9 +1,7 @@
-#include"board.h"
+#ifndef MOVE_H
+#define MOVE_H
 
-typedef struct Seat Seat;
+#include "data.h"
 
-extern const Board PiecePut[KINDNUM];
 
-extern const Board PieceMove[KINDNUM][BOARDLENGTH];
-
-void testInitMoveStr();
+#endif /* MOVE_H */

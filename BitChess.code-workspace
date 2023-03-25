@@ -7,7 +7,10 @@
 	"settings": {
 		"files.associations": {
 			"board.h": "c",
-			"stdint.h": "c"
+			"stdint.h": "c",
+			"type_traits": "c",
+			"uchar.h": "c",
+			"wchar.h": "c"
 		}
 	}
 }
