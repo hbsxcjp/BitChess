@@ -1,6 +1,8 @@
 #ifndef DATA_H
 #define DATA_H
 
+#include <stdbool.h>
+
 #define BOARDBITSIZE 128
 #define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
 #define BOARDAT(i) ((Board)1 << i)
@@ -12,6 +14,7 @@
 #define BOARDROWNUM 10
 #define BOARDCOLNUM 9
 #define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
+#define INDEXFROMROWCOL(row, col) (row * BOARDCOLNUM + col)
 
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
 #define BINARYPATTERN10 "%c%c%c%c%c%c%c%c%c%c "
@@ -80,8 +83,8 @@ typedef struct ChessPosition
     Board pieces[COLORNUM][KINDNUM];
 
     // 计算中间存储数据(基本局面改动时更新)
-    Board colorPieces[COLORNUM + 1];
-
+    Board calPieces[COLORNUM + 1];
+    Board rorate90;
 } ChessPosition;
 
 extern Seat Seats[BOARDLENGTH];
@@ -92,7 +95,7 @@ extern Board PiecePut[KINDNUM];
 
 extern Board PieceMove[KINDNUM][BOARDLENGTH];
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum);
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRorate);
 
 void initData();
 

@@ -4,6 +4,7 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <wchar.h>
 
@@ -180,6 +181,28 @@ static int getHighNonZeroIndex(Board board)
     return index;
 }
 
+static ChessPosition *calChessPosition(ChessPosition *chess)
+{
+    Board rorate90 = 0,
+          allBoard = chess->calPieces[ALLCOLOR] = chess->calPieces[RED] | chess->calPieces[BLACK];
+
+    // 更新旋转位棋盘
+    for (int col = 0; col < BOARDCOLNUM; ++col)
+    {
+        Board colBoard = 0;
+        for (int row = 0; row < BOARDROWNUM; ++row)
+        {
+            if (allBoard & BoardMask[INDEXFROMROWCOL(row, col)])
+                colBoard |= BoardMask[row];
+        }
+
+        rorate90 |= colBoard << (col * BOARDROWNUM);
+    }
+
+    chess->rorate90 = rorate90;
+    return chess;
+}
+
 ChessPosition *getChessPositionFromFen(ChessPosition *chess, const char *fen)
 {
     char pieChars[BOARDLENGTH + 1] = {};
@@ -187,20 +210,17 @@ ChessPosition *getChessPositionFromFen(ChessPosition *chess, const char *fen)
 
     for (int index = 0; index < BOARDLENGTH; ++index)
     {
-        char ch = pieChars[index];
-        if (ch == NullChar)
-            continue;
-
-        chess->pieces[getColor(ch)][getKind(ch)] |= BoardMask[index];
+        char ch;
+        if ((ch = pieChars[index]) != NullChar)
+            chess->pieces[getColor(ch)][getKind(ch)] |= BoardMask[index];
     }
 
     // 设置分颜色棋盘
     for (Color color = RED; color <= BLACK; ++color)
         for (Kind kind = KING; kind <= PAWN; ++kind)
-            chess->colorPieces[color] |= chess->pieces[color][kind];
+            chess->calPieces[color] |= chess->pieces[color][kind];
 
-    chess->colorPieces[ALLCOLOR] = chess->colorPieces[RED] | chess->colorPieces[BLACK];
-    return chess;
+    return calChessPosition(chess);
 }
 
 char *getFenFromChessPosition(char *fen, const ChessPosition *chess)
@@ -219,8 +239,6 @@ char *getFenFromChessPosition(char *fen, const ChessPosition *chess)
             while (board)
             {
                 int index = getNonZeroIndex(board);
-                // int index = getLowNonZeroIndex(board);
-                // int index = getHighNonZeroIndex(board);
                 pieChars[index] = ch;
                 board ^= BoardMask[index];
             }
@@ -235,34 +253,43 @@ ChessPosition *doMoveChessPosition(ChessPosition *chess, Color color, Kind kind,
 {
     chess->player = !chess->player;
 
+    // 清除原位置，置位新位置
     Board moveBoard = BoardMask[fromIndex] | BoardMask[toIndex];
-    chess->colorPieces[color] ^= moveBoard;
-    chess->pieces[color][kind] ^= moveBoard; // 清除原位置，置位新位置
+    chess->calPieces[color] ^= moveBoard;
+    chess->pieces[color][kind] ^= moveBoard;
 
+    // 清除新位置
     Color toColor = !color;
-    chess->colorPieces[toColor] ^= BoardMask[toIndex];
+    chess->calPieces[toColor] ^= BoardMask[toIndex];
     for (Kind toKind = KING; toKind <= PAWN; ++toKind)
-        chess->pieces[toColor][toKind] ^= BoardMask[toIndex]; // 清除新位置
+        chess->pieces[toColor][toKind] ^= BoardMask[toIndex];
 
-    chess->colorPieces[ALLCOLOR] = chess->colorPieces[RED] | chess->colorPieces[BLACK];
-    return chess;
+    return calChessPosition(chess);
 }
 
 static char *getChessPositionStr(char *chessStr, const ChessPosition *chess)
 {
-    static const char *colorStrs[] = {"RED", "BLACK", "ALLCOLOR"};
-    char temp[1024];
-    snprintf(temp, 32, "player: %s\n", colorStrs[chess->player]);
+    const char *colorStrs[] = {"RED", "BLACK"};
+    char temp[KINDNUM * (BOARDROWNUM + 2) * 16];
+    snprintf(temp, 128, "player: %s\n", colorStrs[chess->player]);
     strcpy(chessStr, temp);
-    for (Color color = RED; color <= ALLCOLOR; ++color)
+    for (Color color = RED; color <= BLACK; ++color)
     {
-        snprintf(temp, 32, "color: %s\n", colorStrs[color]);
+        snprintf(temp, 32, "chess->pieces[%s][Kind]:\n", colorStrs[!color]);
         strcat(chessStr, temp);
 
-        char boardStr[KINDNUM * (BOARDROWNUM + 2) * 16];
-        getBoardStr(boardStr, chess->pieces[color], color == ALLCOLOR ? COLORNUM + 1 : KINDNUM, KINDNUM);
-        strcat(chessStr, boardStr);
+        getBoardStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, false);
+        strcat(chessStr, temp);
     }
+
+    snprintf(temp, 128, "calPieces[Color]: \nRED:         BLACK:    ALLCOLOR:\n");
+    strcat(chessStr, temp);
+    getBoardStr(temp, chess->calPieces, COLORNUM + 1, KINDNUM, false);
+    strcat(chessStr, temp);
+
+    strcat(chessStr, "rorate90: \n");
+    getBoardStr(temp, &chess->rorate90, 1, KINDNUM, true);
+    strcat(chessStr, temp);
 
     return chessStr;
 }
@@ -286,18 +313,14 @@ char *getChessPositionBoardStr(char *boardStr, const ChessPosition *chess)
         int (*getNonZeroIndex)(Board) = color == BLACK ? getHighNonZeroIndex : getLowNonZeroIndex;
         for (Kind kind = KING; kind <= PAWN; ++kind)
         {
-            // wchar_t name = getPrintName(color, kind);
             char ch = Chars[color][kind];
             Board board = chess->pieces[color][kind];
             while (board)
             {
                 int index = getNonZeroIndex(board);
-                // int index = getLowNonZeroIndex(board);
-                // int index = getHighNonZeroIndex(board);
                 Seat seat = Seats[index];
-                boardStr[(BOARDROWNUM - seat.row - 1) * (BOARDCOLNUM + 1) + seat.col] = ch;
+                boardStr[seat.row * (BOARDCOLNUM + 1) + seat.col] = ch;
 
-                // pieChars[index] = ch;
                 board ^= BoardMask[index];
             }
         }

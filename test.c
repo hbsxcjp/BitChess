@@ -20,9 +20,8 @@ int main()
     // printChessPosition();
 
     // Test move.c
-    // initPieceCanMove();
-    // printMove();
-    printIndexMode();
+    initPieceCanMove();
+    printPieceCanMove();
 
     return 0;
 }

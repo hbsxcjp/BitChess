@@ -2,7 +2,6 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdbool.h>
 #include <string.h>
 
 Seat Seats[BOARDLENGTH];
@@ -21,7 +20,7 @@ bool isValid(int frow, int fcol) { return true; } // 所有位置均有效
 
 static int getIndexFromSeat(Seat seat)
 {
-    return seat.row * BOARDCOLNUM + seat.col;
+    return INDEXFROMROWCOL(seat.row, seat.col);
 }
 
 static bool isValidKing(int frow, int fcol)
@@ -289,13 +288,13 @@ void initData()
                 if (isValids[kind](row, col))
                 {
                     // 棋子可放至位置的位棋盘
-                    PiecePut[kind] |= BOARDAT(index);
+                    PiecePut[kind] |= BoardMask[index];
 
                     int toIndex[BOARDCOLNUM + BOARDROWNUM];
                     int count = getMoveTos[kind](toIndex, row, col);
                     for (int i = 0; i < count; ++i)
                         // 棋子在每一位置可移动至位置的位棋盘
-                        PieceMove[kind][index] |= BOARDAT(toIndex[i]);
+                        PieceMove[kind][index] |= BoardMask[toIndex[i]];
                 }
                 else
                     PieceMove[kind][index] = 0;
@@ -306,7 +305,7 @@ void initData()
     }
 }
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRorate)
 {
     if (length < colNum)
         colNum = length;
@@ -316,7 +315,7 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
         nullRowStr[colNum * 16];
     strcpy(nullRowStr, "  ");
     for (int col = 0; col < colNum; ++col)
-        strcat(nullRowStr, " ABCDEFGHI");
+        strcat(nullRowStr, isRorate ? " 0123456789" : " ABCDEFGHI");
     strcat(nullRowStr, "\n");
 
     strcpy(boardStr, "");
@@ -332,14 +331,23 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum)
         strcat(boardStr, indexRowStr);
         strcat(boardStr, nullRowStr);
 
-        for (int row = 0; row < BOARDROWNUM; ++row)
+        int totalRow = isRorate ? BOARDCOLNUM : BOARDROWNUM,
+            totalCol = !isRorate ? BOARDCOLNUM : BOARDROWNUM,
+            mode = !isRorate ? 0x1FF : 0x3FF;
+        for (int row = 0; row < totalRow; ++row)
         {
-            snprintf(temp, 16, "%d: ", row);
+            if (isRorate)
+                snprintf(temp, 16, "%c: ", 'A' + row);
+            else
+                snprintf(temp, 16, "%d: ", row);
             strcat(boardStr, temp);
             for (int col = 0; col < colNum; ++col)
             {
-                int rowInt = (boards[index + col] >> (row * BOARDCOLNUM)) & 0x1FF;
-                snprintf(temp, 16, BINARYPATTERN9, BYTEBINARY9(rowInt));
+                int rowOrCol = (boards[index + col] >> (row * totalCol)) & mode;
+                if (isRorate)
+                    snprintf(temp, 16, BINARYPATTERN10, BYTEBINARY10(rowOrCol));
+                else
+                    snprintf(temp, 16, BINARYPATTERN9, BYTEBINARY9(rowOrCol));
                 strcat(boardStr, temp);
             }
             strcat(boardStr, "\n");
@@ -364,15 +372,15 @@ void printData()
     }
     printf("testSeats:\n%s\n", boardStr);
 
-    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM);
+    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, false);
     printf("testBoardMask:\n%s\n", boardStr);
 
-    getBoardStr(boardStr, PiecePut, KINDNUM, KINDNUM);
+    getBoardStr(boardStr, PiecePut, KINDNUM, KINDNUM, false);
     printf("testPiecePut:\n%s\n", boardStr);
 
     for (int kind = 0; kind < KINDNUM; ++kind)
     {
-        getBoardStr(boardStr, PieceMove[kind], BOARDLENGTH, BOARDCOLNUM);
+        getBoardStr(boardStr, PieceMove[kind], BOARDLENGTH, BOARDCOLNUM, false);
         printf("testPieceMove kind: %d\n%s\n", kind, boardStr);
     }
 }

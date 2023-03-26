@@ -3,10 +3,9 @@
 
 #include "data.h"
 
-void printIndexMode();
 
 void initPieceCanMove();
 
-void printMove();
+void printPieceCanMove();
 
 #endif /* MOVE_H */

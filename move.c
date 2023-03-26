@@ -10,6 +10,10 @@
 #define HasPiece(rowOrColInt, index) (rowOrColInt & (1 << index))
 
 #define MODEMAX 32
+#define ROWSTATEMAX (1 << BOARDCOLNUM)
+#define COLSTATEMAX (1 << BOARDROWNUM)
+#define ROWOFFSET(row) (row * BOARDCOLNUM)
+#define COLOFFSET(col) (col * BOARDROWNUM)
 
 typedef struct IndexMode
 {
@@ -20,26 +24,17 @@ typedef struct IndexMode
     int modeMatch[MODEMAX];
 } IndexMode;
 
-Board RookRowCanMove[BOARDLENGTH][1 << BOARDCOLNUM];
-
-Board RookColCanMove[BOARDLENGTH][1 << BOARDROWNUM];
-
-Board CannonRowCanMove[BOARDLENGTH][1 << BOARDCOLNUM];
-
-Board CannonColCanMove[BOARDLENGTH][1 << BOARDROWNUM];
-
 IndexMode RowIndexMode[BOARDCOLNUM];
 
 IndexMode ColIndexMode[BOARDROWNUM];
 
-static int getModeMatch(int state, IndexMode indexMode)
-{
-    for (int i = 0; i < indexMode.count; ++i)
-        if ((state & indexMode.modeFetch[i]) == indexMode.mode[i])
-            return indexMode.modeMatch[i];
+Board RookRowCanMove[BOARDLENGTH][ROWSTATEMAX];
 
-    return 0;
-}
+Board RookColCanMove[BOARDLENGTH][COLSTATEMAX];
+
+Board CannonRowCanMove[BOARDLENGTH][ROWSTATEMAX];
+
+Board CannonColCanMove[BOARDLENGTH][COLSTATEMAX];
 
 static void initIndexMode()
 {
@@ -57,13 +52,13 @@ static void initIndexMode()
                 int lowMode = startMode | (1 << lowBit); // 位重叠
                 for (int highBit = index; highBit < lengths[no]; ++highBit)
                 {
-                    indexMode.mode[count] = lowMode | (1 << highBit);
+                    indexMode.mode[count] = lowMode | (1 << highBit); // 高低的界限置位
                     int low = lowBit == index ? 0 : lowBit,
                         high = highBit == index ? lengths[no] - 1 : highBit; // 位重叠时，提取位到底
                     for (int i = low; i <= high; ++i)
-                        indexMode.modeFetch[count] |= (1 << i);
+                        indexMode.modeFetch[count] |= (1 << i); // 高至低之间范围置位
 
-                    indexMode.modeMatch[count] = indexMode.modeFetch[count] ^ startMode;
+                    indexMode.modeMatch[count] = indexMode.modeFetch[count] ^ startMode; // 提取范围去掉棋子自身所占位置
                     ++count;
                 }
             }
@@ -74,39 +69,64 @@ static void initIndexMode()
     }
 }
 
-void printIndexMode()
+static Board getModeMatchBoard(int state, IndexMode indexMode, int offset)
+{
+    for (int i = 0; i < indexMode.count; ++i)
+        if ((state & indexMode.modeFetch[i]) == indexMode.mode[i])
+            return BOARDFROM(indexMode.modeMatch[i], offset);
+
+    return 0;
+}
+
+static void initRookRowCanMove()
+{
+    int index = 0;
+    for (int row = 0; row < BOARDROWNUM; ++row)
+    {
+        int offset = ROWOFFSET(row);
+        for (int col = 0; col < BOARDCOLNUM; ++col)
+        {
+            IndexMode indexMode = RowIndexMode[col];
+            for (int state = 0; state < ROWSTATEMAX; ++state)
+            {
+                if (state & BoardMask[col]) // 棋子在此状态上
+                {
+                    RookRowCanMove[index][state] = getModeMatchBoard(state, indexMode, offset);
+                }
+            }
+
+            ++index;
+        }
+    }
+}
+
+static void initRookColCanMove()
+{
+    int index = 0;
+    for (int col = 0; col < BOARDCOLNUM; ++col)
+    {
+        int offset = COLOFFSET(col);
+        for (int row = 0; row < BOARDROWNUM; ++row)
+        {
+            IndexMode indexMode = ColIndexMode[row];
+            for (int state = 0; state < COLSTATEMAX; ++state)
+            {
+                if (state & BoardMask[row]) // 棋子在此状态上
+                {
+                    RookColCanMove[index][state] = getModeMatchBoard(state, indexMode, offset); // ?
+                }
+            }
+
+            ++index;
+        }
+    }
+}
+
+void initPieceCanMove()
 {
     initIndexMode();
-
-    int lengths[] = {BOARDCOLNUM, BOARDROWNUM};
-    IndexMode *indexModes[] = {RowIndexMode, ColIndexMode};
-    for (int no = 0; no < 2; ++no)
-    {
-        printf("IndexModes[%d]:\n", no);
-        for (int index = 0; index < lengths[no]; ++index)
-        {
-            IndexMode indexMode = indexModes[no][index];
-            int count = indexMode.count;
-            printf("indexMode[%d]: count: %d\n", index, count);
-            for (int i = 0; i < count; ++i)
-            {
-                if (no == 0)
-                {
-                    printf(BINARYPATTERN9, BYTEBINARY9(indexMode.mode[i]));
-                    printf(BINARYPATTERN9, BYTEBINARY9(indexMode.modeFetch[i]));
-                    printf(BINARYPATTERN9, BYTEBINARY9(indexMode.modeMatch[i]));
-                }
-                else
-                {
-                    printf(BINARYPATTERN10, BYTEBINARY10(indexMode.mode[i]));
-                    printf(BINARYPATTERN10, BYTEBINARY10(indexMode.modeFetch[i]));
-                    printf(BINARYPATTERN10, BYTEBINARY10(indexMode.modeMatch[i]));
-                }
-                printf("\n");
-            }
-        }
-        printf("\n");
-    }
+    initRookRowCanMove();
+    initRookColCanMove();
 }
 
 // Count the consecutive zero bits(trailing)
@@ -210,99 +230,165 @@ void printIndexMode()
 //     return count;
 // }
 
-static int
-getToInt(int state, int curColOrRow, bool isCannon, bool isRow, int high)
+// static int
+// getToInt(int state, int curColOrRow, bool isCannon, bool isRow, int high)
+// {
+//     int toInt = 0;
+//     int direction = high ? 1 : -1,
+//         end = high ? (isRow ? BOARDCOLNUM : BOARDROWNUM) - 1 : 0; // 每行列数或每列行数
+//     bool skip = false;                                            // 炮是否已跳
+//     for (int i = direction * (curColOrRow + direction); i <= end; ++i)
+//     {
+//         int index = direction * i;
+//         bool hasPiece = HasPiece(state, index);
+//         if (isCannon)
+//         {
+//             if (!skip)
+//             {
+//                 if (hasPiece)
+//                     skip = true;
+//                 else
+//                     toInt |= 1 << index;
+//             }
+//             else if (hasPiece)
+//             {
+//                 toInt |= 1 << index;
+//                 break;
+//             }
+//         }
+//         else
+//         {
+//             toInt |= 1 << index;
+//             if (hasPiece) // 遇到棋子
+//                 break;
+//         }
+//     }
+
+//     return toInt;
+// }
+
+// void initRookCannonCanMove(int stateCount, Board canMove[][stateCount], bool isCannon, bool isRow)
+// {
+//     for (int index = 0; index < BOARDLENGTH; ++index)
+//     {
+//         int curColOrRow = isRow ? Seats[index].col : Seats[index].row; // 当前序号的某行(列)
+//         for (int state = 0; state < stateCount; ++state)               // 每行或每列的全部二进制状态
+//         {
+//             if (!HasPiece(state, curColOrRow)) // 本状态curColOrRow位置无棋子，置0后继续
+//                 continue;
+
+//             int toInt = 0;
+//             for (int high = 0; high < 2; ++high)
+//                 toInt = getToInt(state, curColOrRow, isCannon, isRow, high);
+
+//             if (toInt == 0)
+//                 continue;
+
+//             canMove[index][state] = BOARDFROM(toInt, curColOrRow * (isRow ? BOARDCOLNUM : BOARDROWNUM));
+//             if (!isRow)
+//             {
+//                 // 旋转90度 canMove[index][state]
+//             }
+//         }
+//     }
+// }
+void printIndexMode()
 {
-    int toInt = 0;
-    int direction = high ? 1 : -1,
-        end = high ? (isRow ? BOARDCOLNUM : BOARDROWNUM) - 1 : 0; // 每行列数或每列行数
-    bool skip = false;                                            // 炮是否已跳
-    for (int i = direction * (curColOrRow + direction); i <= end; ++i)
+    int lengths[] = {BOARDCOLNUM, BOARDROWNUM};
+    IndexMode *indexModes[] = {RowIndexMode, ColIndexMode};
+    for (int no = 0; no < 2; ++no)
     {
-        int index = direction * i;
-        bool hasPiece = HasPiece(state, index);
-        if (isCannon)
+        printf("IndexModes[%d]:\n", no);
+        for (int index = 0; index < lengths[no]; ++index)
         {
-            if (!skip)
+            IndexMode indexMode = indexModes[no][index];
+            int count = indexMode.count;
+            printf("indexMode[%d]: count: %d\n", index, count);
+            for (int i = 0; i < count; ++i)
             {
-                if (hasPiece)
-                    skip = true;
+                if (no == 0)
+                {
+                    printf(BINARYPATTERN9, BYTEBINARY9(indexMode.mode[i]));
+                    printf(BINARYPATTERN9, BYTEBINARY9(indexMode.modeFetch[i]));
+                    printf(BINARYPATTERN9, BYTEBINARY9(indexMode.modeMatch[i]));
+                }
                 else
-                    toInt |= 1 << index;
-            }
-            else if (hasPiece)
-            {
-                toInt |= 1 << index;
-                break;
-            }
-        }
-        else
-        {
-            toInt |= 1 << index;
-            if (hasPiece) // 遇到棋子
-                break;
-        }
-    }
-
-    return toInt;
-}
-
-static void initRookCannonCanMove(int stateCount, Board canMove[][stateCount], bool isCannon, bool isRow)
-{
-    for (int index = 0; index < BOARDLENGTH; ++index)
-    {
-        int curColOrRow = isRow ? Seats[index].col : Seats[index].row; // 当前序号的某行(列)
-        for (int state = 0; state < stateCount; ++state)               // 每行或每列的全部二进制状态
-        {
-            if (!HasPiece(state, curColOrRow)) // 本状态curColOrRow位置无棋子，置0后继续
-                continue;
-
-            int toInt = 0;
-            for (int high = 0; high < 2; ++high)
-                toInt = getToInt(state, curColOrRow, isCannon, isRow, high);
-
-            if (toInt == 0)
-                continue;
-
-            canMove[index][state] = BOARDFROM(toInt, curColOrRow * (isRow ? BOARDCOLNUM : BOARDROWNUM));
-            if (!isRow)
-            {
-                // 旋转90度 canMove[index][state]
+                {
+                    printf(BINARYPATTERN10, BYTEBINARY10(indexMode.mode[i]));
+                    printf(BINARYPATTERN10, BYTEBINARY10(indexMode.modeFetch[i]));
+                    printf(BINARYPATTERN10, BYTEBINARY10(indexMode.modeMatch[i]));
+                }
+                printf("\n");
             }
         }
+        printf("\n");
     }
 }
 
-void initPieceCanMove()
+static void printRookRowCanMove()
 {
-    bool isRow = true;
-    int stateCount = 1 << (isRow ? BOARDCOLNUM : BOARDROWNUM); // 状态总数量
-    initRookCannonCanMove(stateCount, RookRowCanMove, false, isRow);
-}
-
-void printMove()
-{
-    printf("printMove:\n");
-    bool isRow = true;
-    int stateCount = 1 << (isRow ? BOARDCOLNUM : BOARDROWNUM); // 状态总数量
+    printf("printRookRowCanMove:\n");
     char temp[32];
     for (int index = 0; index < BOARDLENGTH; ++index)
     {
         int row = Seats[index].row,
             col = Seats[index].col;
+        int offset = ROWOFFSET(row);
         snprintf(temp, 32, BINARYPATTERN9, BYTEBINARY9(1 << col));
-        printf("col: %s\ncanMove:  ", temp);
+        printf("col: %s canMove:\n", temp);
+        int count = 0;
         Board *canMove = RookRowCanMove[index];
-        for (int state = 0; state < stateCount; ++state)
+        for (int state = 0; state < BoardMask[BOARDCOLNUM]; ++state)
         {
             if (canMove[state])
             {
                 printf(BINARYPATTERN9, BYTEBINARY9(state));
-                int rowInt = (canMove[state] >> (row * BOARDCOLNUM) & 0X1FF);
-                printf(BINARYPATTERN9, BYTEBINARY9(rowInt));
-                printf(" | ");
+                printf(BINARYPATTERN9, BYTEBINARY9(canMove[state] >> offset));
+                if (count % 5 == 4)
+                    printf("\n");
+                else
+                    printf("| ");
+
+                count++;
             }
         }
         printf("\n\n");
     }
+}
+
+static void printRookColCanMove()
+{
+    printf("printRookColCanMove:\n");
+    char temp[32];
+    for (int index = 0; index < BOARDLENGTH; ++index)
+    {
+        int row = Seats[index].row,
+            col = Seats[index].col;
+        int offset = COLOFFSET(col);
+        snprintf(temp, 32, BINARYPATTERN10, BYTEBINARY10(1 << row));
+        printf("row: %s canMove:\n", temp);
+        int count = 0;
+        Board *canMove = RookColCanMove[index];
+        for (int state = 0; state < BoardMask[BOARDROWNUM]; ++state)
+        {
+            if (canMove[state])
+            {
+                printf(BINARYPATTERN10, BYTEBINARY10(state));
+                printf(BINARYPATTERN10, BYTEBINARY10(canMove[state] >> offset));
+                if (count % 5 == 4)
+                    printf("\n");
+                else
+                    printf("| ");
+
+                count++;
+            }
+        }
+        printf("\n\n");
+    }
+}
+
+void printPieceCanMove()
+{
+    // printRookRowCanMove();
+    printRookColCanMove();
 }
