@@ -12,13 +12,17 @@
 
 int main()
 {
-    // Test getData.c
-    // testGenData();
+    // Test data.c
+    initData();
+    // printData();
 
     // Test board.c
-    testChessPosition();
+    // printChessPosition();
 
     // Test move.c
+    // initPieceCanMove();
+    // printMove();
+    printIndexMode();
 
     return 0;
 }

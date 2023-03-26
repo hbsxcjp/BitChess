@@ -5,13 +5,12 @@
 
 ChessPosition *updateChessPositionData(ChessPosition *chess);
 
-ChessPosition *setChessPositionFromFen(ChessPosition *chess, const char *fen);
+ChessPosition *getChessPositionFromFen(ChessPosition *chess, const char *fen);
 
-char *setFenFromChessPosition(char *fen, const ChessPosition *chess);
+char *getFenFromChessPosition(char *fen, const ChessPosition *chess);
 
 char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum);
 
-
-void testChessPosition();
+void printChessPosition();
 
 #endif /* BOARD_H */

@@ -10,7 +10,9 @@
 			"stdint.h": "c",
 			"type_traits": "c",
 			"uchar.h": "c",
-			"wchar.h": "c"
+			"wchar.h": "c",
+			"cinttypes": "c",
+			"string.h": "c"
 		}
 	}
 }
