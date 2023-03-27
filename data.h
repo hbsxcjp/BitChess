@@ -95,6 +95,8 @@ extern Board PiecePut[KINDNUM];
 
 extern Board PieceMove[KINDNUM][BOARDLENGTH];
 
+char* getRowColBit(char* bitStr, int value, bool isCol);
+
 char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRorate);
 
 void initData();
