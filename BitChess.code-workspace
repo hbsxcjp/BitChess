@@ -14,7 +14,12 @@
 			"cinttypes": "c",
 			"string.h": "c",
 			"locale.h": "c",
-			"assert.h": "c"
+			"assert.h": "c",
+			"limits": "c",
+			"*.tcc": "c",
+			"math.h": "c",
+			"cmath": "c",
+			"cstdlib": "c"
 		}
 	}
 }
