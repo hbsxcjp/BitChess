@@ -9,13 +9,14 @@
 
 #define HasPiece(rowOrColInt, index) (rowOrColInt & (1 << index))
 
-#define MODEMAX 600
+#define MODEMAX 96
 #define ROWSTATEMAX (1 << BOARDCOLNUM)
 #define COLSTATEMAX (1 << BOARDROWNUM)
 #define ROWOFFSET(row) (row * BOARDCOLNUM)
 #define COLOFFSET(col) (col * BOARDROWNUM)
 
-typedef struct RowColMode {
+typedef struct RowColMode
+{
     int count;
 
     int mode[MODEMAX];
@@ -37,74 +38,76 @@ Board CannonColCanMove[BOARDLENGTH][COLSTATEMAX];
 
 static void initRookCannonRowColMode()
 {
-    for (Kind kind = ROOK; kind <= CANNON; ++kind) {
+    for (Kind kind = ROOK; kind <= CANNON; ++kind)
+    {
         bool isCannon = kind == CANNON;
-        for (int isCol = 0; isCol < 2; ++isCol) {
+        for (int isCol = 0; isCol < 2; ++isCol)
+        {
             int length = isCol ? BOARDROWNUM : BOARDCOLNUM;
-            RowColMode* rowColModes = (isCannon
-                    ? (isCol ? CannonColMode : CannonRowMode)
-                    : (isCol ? RookColMode : RookRowMode));
-            for (int index = 0; index < length; ++index) {
+            RowColMode *rowColModes = (isCannon
+                                           ? (isCol ? CannonColMode : CannonRowMode)
+                                           : (isCol ? RookColMode : RookRowMode));
+            for (int index = 0; index < length; ++index)
+            {
                 int count = 0, atIndex = INTBITAT(index);
                 RowColMode rowColMode = {};
-                for (int lowBit = index - 1; lowBit >= -1; --lowBit) {
+                for (int lowBit = index - 1; lowBit >= -1; --lowBit)
+                {
                     int lowMode = atIndex, lowFetch = atIndex, lowMatch = 0;
-                    // 范围置位
-                    for (int i = lowBit == -1 ? 0 : lowBit; i < index; ++i) {
+                    for (int i = lowBit == -1 ? 0 : lowBit; i < index; ++i)
                         lowFetch |= INTBITAT(i);
-                        lowMatch |= INTBITAT(i);
-                    }
-                    if (lowBit > -1) {
+
+                    lowMatch = lowFetch ^ atIndex;
+                    if (lowBit > -1)
+                    {
                         lowMode |= INTBITAT(lowBit);
                         if (isCannon)
                             lowMatch ^= INTBITAT(lowBit);
                     }
 
-                    // 当lowBit在0或-1时，skipLowBit循环一次
-                    bool lowSkip = isCannon && lowBit < index - 1;
-                    int skipLow = lowSkip ? lowBit : 0;
-                    for (int skipLowBit = skipLow; skipLowBit >= 0; --skipLowBit) {
+                    // 取0时，只一次循环
+                    int skipLow = isCannon ? lowBit - 1 : 0;
+                    if (skipLow < 0)
+                        skipLow = 0;
+                    // int skipHigh = isCannon ? (highBit == index + 1 ? highBit + 1 : highBit) : length - 1;
+                    for (int skipLowBit = skipLow; skipLowBit >= 0; --skipLowBit)
+                    {
                         int skipLowMode = 0, skipLowFetch = 0, skipLowMatch = 0;
-                        // 左边已跳棋子
-                        if (lowSkip) {
-                            // 界限置位
+                        if (isCannon && lowBit > 0)
+                        {
                             skipLowMode = INTBITAT(skipLowBit);
-                            // 范围置位
+                            skipLowMatch = INTBITAT(skipLowBit);
                             for (int i = skipLowBit; i <= skipLow; ++i)
                                 skipLowFetch |= INTBITAT(i);
-
-                            // 匹配置位
-                            skipLowMatch = INTBITAT(skipLowBit);
                         }
 
-                        for (int highBit = index + 1; highBit <= length; ++highBit) {
+                        for (int highBit = index + 1; highBit <= length; ++highBit)
+                        {
                             int highMode = 0, highFetch = 0, highMatch = 0;
-                            // 范围置位
-                            for (int i = index + 1; i <= (highBit == length ? length - 1 : highBit); ++i) {
+                            for (int i = index + 1; i <= (highBit == length ? length - 1 : highBit); ++i)
                                 highFetch |= INTBITAT(i);
-                                highMatch |= INTBITAT(i);
-                            }
-                            if (highBit < length) {
+
+                            highMatch = highFetch;
+                            if (highBit < length)
+                            {
                                 highMode = INTBITAT(highBit);
                                 if (isCannon)
                                     highMatch ^= INTBITAT(highBit);
                             }
 
-                            // 当highBit在length-1或length时，循环一次
-                            // bool highSkip = isCannon && highBit > index + 1;
-                            int skipHigh = isCannon ? highBit : length - 1;
-                            for (int skipHighBit = skipHigh; skipHighBit < length; ++skipHighBit) {
+                            // 取length-1时，只一次循环
+                            int skipHigh = isCannon ? highBit + 1 : length - 1;
+                            if (skipHigh >= length)
+                                skipHigh = length - 1;
+                            for (int skipHighBit = skipHigh; skipHighBit < length; ++skipHighBit)
+                            {
                                 int skipHighMode = 0, skipHighFetch = 0, skipHighMatch = 0;
-                                // 右边已跳棋子
-                                if (isCannon) {
-                                    // 界限置位
+                                if (isCannon && highBit < length - 1)
+                                {
                                     skipHighMode = INTBITAT(skipHighBit);
-                                    // 范围置位
+                                    skipHighMatch = INTBITAT(skipHighBit);
                                     for (int i = skipHigh; i <= skipHighBit; ++i)
                                         skipHighFetch |= INTBITAT(i);
-
-                                    // 匹配置位
-                                    skipHighMatch = INTBITAT(skipHighBit);
                                 }
 
                                 rowColMode.mode[count] = skipLowMode | lowMode | highMode | skipHighMode;
@@ -124,25 +127,33 @@ static void initRookCannonRowColMode()
 
 static void initRookCannonRowColCanMove()
 {
-    for (Kind kind = ROOK; kind <= CANNON; ++kind) {
-        for (int isCol = 0; isCol < 2; ++isCol) {
+    for (Kind kind = ROOK; kind <= CANNON; ++kind)
+    {
+        for (int isCol = 0; isCol < 2; ++isCol)
+        {
             int index = 0;
             int stateTotal = isCol ? COLSTATEMAX : ROWSTATEMAX;
-            for (int row = 0; row < BOARDROWNUM; ++row) {
-                for (int col = 0; col < BOARDCOLNUM; ++col) {
+            for (int row = 0; row < BOARDROWNUM; ++row)
+            {
+                for (int col = 0; col < BOARDCOLNUM; ++col)
+                {
                     int offset = isCol ? COLOFFSET(col) : ROWOFFSET(row),
                         modeIndex = isCol ? row : col;
                     RowColMode rowColMode = (kind == ROOK
-                            ? (isCol ? RookColMode[modeIndex] : RookRowMode[modeIndex])
-                            : (isCol ? CannonColMode[modeIndex] : CannonRowMode[modeIndex]));
-                    Board* boards = (kind == ROOK ? (isCol ? RookColCanMove[index] : RookRowCanMove[index])
+                                                 ? (isCol ? RookColMode[modeIndex] : RookRowMode[modeIndex])
+                                                 : (isCol ? CannonColMode[modeIndex] : CannonRowMode[modeIndex]));
+                    Board *boards = (kind == ROOK ? (isCol ? RookColCanMove[index] : RookRowCanMove[index])
                                                   : (isCol ? CannonColCanMove[index] : CannonRowCanMove[index]));
-                    for (int state = 0; state < stateTotal; ++state) {
+                    for (int state = 0; state < stateTotal; ++state)
+                    {
                         // 棋子在此状态上
-                        if (state & BoardMask[modeIndex]) {
+                        if (state & BoardMask[modeIndex])
+                        {
                             for (int i = 0; i < rowColMode.count; ++i)
-                                if ((state & rowColMode.fetch[i]) == rowColMode.mode[i]) {
-                                    boards[state] = BOARDFROM(rowColMode.match[i], offset);
+                                if ((state & rowColMode.fetch[i]) == rowColMode.mode[i])
+                                {
+                                    boards[state] = rowColMode.match[i];
+                                    // boards[state] = BOARDFROM(rowColMode.match[i], offset);
                                     break;
                                 }
                         }
@@ -348,22 +359,27 @@ void initPieceCanMove()
 static void printRookCannonRowColMode()
 {
     char temp[32];
-    for (Kind kind = CANNON; kind <= CANNON; ++kind)
+    // for (Kind kind = CANNON; kind <= CANNON; ++kind)
     // for (Kind kind = ROOK; kind <= ROOK; ++kind)
-    // for (Kind kind = ROOK; kind <= CANNON; ++kind)
+    for (Kind kind = ROOK; kind <= CANNON; ++kind)
     {
         bool isCannon = kind == CANNON;
-        for (int isCol = 0; isCol < 2; ++isCol) {
-            printf("printRookCannonRowColMode: [%s]\n", isCannon ? "Cannon" : "Rook");
+        for (int isCol = 0; isCol < 2; ++isCol)
+        {
+            printf("printRookCannonRowColMode:\n");
             int length = isCol ? BOARDROWNUM : BOARDCOLNUM;
-            RowColMode* rowColModes = (kind == ROOK
-                    ? (isCol ? RookColMode : RookRowMode)
-                    : (isCol ? CannonColMode : CannonRowMode));
-            for (int index = 0; index < length; ++index) {
+            RowColMode *rowColModes = (kind == ROOK
+                                           ? (isCol ? RookColMode : RookRowMode)
+                                           : (isCol ? CannonColMode : CannonRowMode));
+            for (int index = 0; index < length; ++index)
+            {
                 RowColMode rowColMode = rowColModes[index];
                 int count = rowColMode.count;
-                printf("Mode[%s][%d]:\t  count: %d\nmode:      fetch:     match:\n", isCol ? "Col" : "Row", index, count);
-                for (int i = 0; i < count; ++i) {
+                printf("%s, %s Mode[%d] count: %d\nmode:      fetch:     match:\n",
+                       isCannon ? "Cannon" : "Rook",
+                       isCol ? "Col" : "Row", index, count);
+                for (int i = 0; i < count; ++i)
+                {
                     printf(getRowColBit(temp, rowColMode.mode[i], isCol));
                     printf(getRowColBit(temp, rowColMode.fetch[i], isCol));
                     printf(getRowColBit(temp, rowColMode.match[i], isCol));
@@ -377,26 +393,36 @@ static void printRookCannonRowColMode()
 
 static void printRookCannonCanMove(bool isCannon, bool isCol)
 {
-    printf("printRookCannonCanMove: [%s] [%s]\n", isCannon ? "Cannon" : "Rook", isCol ? "Col" : "Row");
+    printf("printRookCannonCanMove:\n");
     char temp[32];
     int index = 0;
-    Board* canMove;
-    for (int row = 0; row < BOARDROWNUM; ++row) {
-        for (int col = 0; col < BOARDCOLNUM; ++col) {
+    Board *canMove;
+    for (int row = 0; row < BOARDROWNUM; ++row)
+    {
+        for (int col = 0; col < BOARDCOLNUM; ++col)
+        {
             int count = 0,
                 offset = isCol ? COLOFFSET(col) : ROWOFFSET(row);
-            printf("%s: %s canMove:  Format[state][match]\n",
-                isCol ? "Col" : "Row", getRowColBit(temp, 1 << (isCol ? row : col), isCol));
-            if (isCannon) {
+            printf("%s, %s: %s canMove: Format[state][match]\n",
+                   isCannon ? "Cannon" : "Rook",
+                   isCol ? "Col" : "Row",
+                   getRowColBit(temp, 1 << (isCol ? row : col), isCol));
+            if (isCannon)
+            {
                 canMove = isCol ? CannonColCanMove[index] : CannonRowCanMove[index];
-            } else {
+            }
+            else
+            {
                 canMove = isCol ? RookColCanMove[index] : RookRowCanMove[index];
             }
             int stateTotal = isCol ? COLSTATEMAX : ROWSTATEMAX;
-            for (int state = 0; state < stateTotal; ++state) {
-                if (canMove[state]) {
+            for (int state = 0; state < stateTotal; ++state)
+            {
+                if (canMove[state])
+                {
                     printf(getRowColBit(temp, state, isCol));
-                    printf(getRowColBit(temp, canMove[state] >> offset, isCol));
+                    printf(getRowColBit(temp, canMove[state], isCol));
+                    // printf(getRowColBit(temp, canMove[state] >> offset, isCol));
                     if (count % 5 == 4)
                         printf("\n");
                     else if (state != stateTotal - 1)
@@ -416,10 +442,12 @@ void printPieceCanMove()
 {
     printRookCannonRowColMode();
 
-    for (Kind kind = ROOK; kind <= CANNON; ++kind) {
+    for (Kind kind = ROOK; kind <= CANNON; ++kind)
+    {
         bool isCannon = kind == CANNON;
-        for (int isCol = 0; isCol < 2; ++isCol) {
-            // printRookCannonCanMove(isCannon, isCol);
+        for (int isCol = 0; isCol < 2; ++isCol)
+        {
+            printRookCannonCanMove(isCannon, isCol);
         }
     }
 }
