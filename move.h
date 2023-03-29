@@ -6,6 +6,5 @@
 
 void initPieceCanMove();
 
-void printPieceCanMove();
 
 #endif /* MOVE_H */

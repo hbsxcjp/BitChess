@@ -23,7 +23,6 @@ int main()
 
     // Test move.c
     initPieceCanMove();
-    printPieceCanMove();
 
     return 0;
 }
