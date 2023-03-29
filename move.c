@@ -400,8 +400,15 @@ static void compareRookCannonRowColMoves()
                 int *moveMatchs2 = (isCannon
                                         ? (isCol ? CannonColCanMove2[index] : CannonRowCanMove2[index])
                                         : (isCol ? RookColCanMove2[index] : RookRowCanMove2[index]));
-                // int count = 0;
+                int count = 0;
                 int count1 = 0, count2 = 0;
+
+#ifdef DEBUGCOMPAREMOVES
+                char temp[32];
+                printf("compareRookCannonCanMove: Format:[count1][count2] %s, %s: %s moveMatchs[state] != moveMatchs2[state]:\n",
+                       isCannon ? "Cannon" : "Rook", isCol ? "Col" : "Row", getRowColBit(temp, INTBITAT(index), isCol));
+#endif
+
                 for (int state = 0; state < stateTotal; ++state)
                 {
                     if (moveMatchs[state])
@@ -409,13 +416,25 @@ static void compareRookCannonRowColMoves()
 
                     if (moveMatchs2[state])
                         ++count2;
+
+#ifdef DEBUGCOMPAREMOVES
+                    // assert(moveMatchs[state] == moveMatchs2[state]); // 比较完个数后再逐一比较match
+                    if (moveMatchs[state] != moveMatchs2[state])
+                    {
+                        printf("%s %s ",
+                               getRowColBit(temp, moveMatchs[state], isCol), getRowColBit(temp, moveMatchs2[state], isCol));
+                        if (count % 8 == 7)
+                            printf("\n");
+                        else if (state != stateTotal - 1)
+                            printf("| ");
+
+                        count++;
+                    }
+#endif
                 }
 
 #ifdef DEBUGCOMPAREMOVES
-                char temp[32];
-                printf("compareRookCannonCanMove: Format:[count1][count2] %s, %s: %s %3d %3d %s\n\n",
-                       isCannon ? "Cannon" : "Rook", isCol ? "Col" : "Row", getRowColBit(temp, INTBITAT(index), isCol),
-                       count1, count2, (count1 == count2 ? "" : "Error."));
+                printf(" %3d %3d %s\n\n", count1, count2, (count1 == count2 ? "" : "Error."));
 #endif
             }
         }
