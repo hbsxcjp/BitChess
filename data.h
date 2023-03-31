@@ -5,9 +5,9 @@
 
 #define BOARDBITSIZE 128
 #define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
-#define BOARDAT(i) ((Board)1 << i)
-#define BOARDFROM(i, offset) ((Board)i << offset)
-#define INTBITAT(i) (1 << i)
+#define BOARDAT(i) ((Board)1 << (i))
+#define BOARDFROM(i, offset) ((Board)(i) << (offset))
+#define INTBITAT(i) (1 << (i))
 
 #define COLORNUM 2
 #define KINDNUM 7
@@ -15,7 +15,7 @@
 #define BOARDROWNUM 10
 #define BOARDCOLNUM 9
 #define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
-#define INDEXFROMROWCOL(row, col) (row * BOARDCOLNUM + col)
+#define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
 
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
 #define BINARYPATTERN10 "%c%c%c%c%c%c%c%c%c%c "
@@ -85,10 +85,12 @@ typedef struct ChessPosition
 
     // 计算中间存储数据(基本局面改动时更新)
     Board calPieces[COLORNUM + 1];
-    Board rorate90;
+    Board rotatePieces;
 } ChessPosition;
 
 extern Seat Seats[BOARDLENGTH];
+
+extern int Rotate[BOARDLENGTH];
 
 extern Board BoardMask[BOARDLENGTH];
 
@@ -96,9 +98,9 @@ extern Board PiecePut[KINDNUM];
 
 extern Board PieceMove[KINDNUM][BOARDLENGTH];
 
-char* getRowColBit(char* bitStr, int value, bool isCol);
+char *getRowColBit(char *bitStr, int value, bool isCol);
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRorate);
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRotate);
 
 void initData();
 

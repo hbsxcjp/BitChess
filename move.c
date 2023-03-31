@@ -7,24 +7,21 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define DEBUGMODE
-// #define DEBUGMOVE
-#define DEBUGMOVE2
-// #define DEBUGCOMPAREMOVES
+#define DEBUGMOVE
 
 #define MODEMAX 96
-#define ROWSTATEMAX (1 << BOARDCOLNUM)
-#define COLSTATEMAX (1 << BOARDROWNUM)
-#define ROWOFFSET(row) (row * BOARDCOLNUM)
-#define COLOFFSET(col) (col * BOARDROWNUM)
+#define ROWSTATEMAX (1 << (BOARDCOLNUM - 1))
+#define COLSTATEMAX (1 << (BOARDROWNUM - 1))
+#define ROWOFFSET(row, col) ((row)*BOARDCOLNUM + (col))
+#define COLOFFSET(col, row) ((col)*BOARDROWNUM + (row))
 
-#define HasPiece(state, index) (state & (1 << index))
+#define HasPiece(state, index) ((state) & (1 << (index)))
 
 // 车炮处于每个位置的每种位置状态可移动位棋盘
-static int RookRowCanMove[BOARDCOLNUM][ROWSTATEMAX];
-static int RookColCanMove[BOARDROWNUM][COLSTATEMAX];
-static int CannonRowCanMove[BOARDCOLNUM][ROWSTATEMAX];
-static int CannonColCanMove[BOARDROWNUM][COLSTATEMAX];
+static Board RookRowCanMove[BOARDLENGTH][ROWSTATEMAX];
+static Board RookColCanMove[BOARDLENGTH][COLSTATEMAX];
+static Board CannonRowCanMove[BOARDLENGTH][ROWSTATEMAX];
+static Board CannonColCanMove[BOARDLENGTH][COLSTATEMAX];
 
 // // 通过二分搜索计算右侧的连续零位（尾随）
 // static unsigned int getLowNonZeroIndexFromUInt(unsigned int value)
@@ -112,7 +109,7 @@ static int CannonColCanMove[BOARDROWNUM][COLSTATEMAX];
 //     return count;
 // }
 
-static int getRowColMatch(int state, int rowColIndex, bool isCannon, bool isCol)
+static Board getMatch(int state, int outIndex, int inIndex, bool isCannon, bool isCol)
 {
     int match = 0;
     for (int isHigh = 0; isHigh < 2; ++isHigh)
@@ -120,7 +117,7 @@ static int getRowColMatch(int state, int rowColIndex, bool isCannon, bool isCol)
         int direction = isHigh ? 1 : -1,
             endIndex = isHigh ? (isCol ? BOARDROWNUM : BOARDCOLNUM) - 1 : 0; // 每行列数或每列行数
         bool skip = false;                                                   // 炮是否已跳
-        for (int i = direction * (rowColIndex + direction); i <= endIndex; ++i)
+        for (int i = direction * (inIndex + direction); i <= endIndex; ++i)
         {
             int index = direction * i;
             bool hasPiece = HasPiece(state, index);
@@ -148,10 +145,20 @@ static int getRowColMatch(int state, int rowColIndex, bool isCannon, bool isCol)
         }
     }
 
-    return match;
+    if (isCol)
+    {
+        Board colMatch = 0;
+        for (int row = 0; row < BOARDROWNUM; ++row)
+            if (match & INTBITAT(row))
+                colMatch |= BoardMask[ROWOFFSET(row, outIndex)];
+
+        return colMatch;
+    }
+
+    return BOARDFROM(match, ROWOFFSET(outIndex, inIndex));
 }
 
-static void initRookCannonRowColMove()
+static void initRookCannonCanMove()
 {
     for (Kind kind = ROOK; kind <= CANNON; ++kind)
     {
@@ -159,44 +166,53 @@ static void initRookCannonRowColMove()
         for (int isCol = 0; isCol < 2; ++isCol)
         {
             int stateTotal = isCol ? COLSTATEMAX : ROWSTATEMAX,
-                length = isCol ? BOARDROWNUM : BOARDCOLNUM;
-            for (int index = 0; index < length; ++index)
+                outLength = isCol ? BOARDCOLNUM : BOARDROWNUM,
+                inLength = isCol ? BOARDROWNUM : BOARDCOLNUM,
+                boardIndex = 0;
+            for (int outIndex = 0; outIndex < outLength; ++outIndex)
             {
-#ifdef DEBUGMOVE2
-                char temp[32];
-                int count = 0;
-                printf("printRookCannonCanMove2:\nFormat:[state][match] %s, %s: %s\n",
-                       isCannon ? "Cannon" : "Rook", isCol ? "Col" : "Row", getRowColBit(temp, INTBITAT(index), isCol));
+                for (int inIndex = 0; inIndex < inLength; ++inIndex)
+                {
+#ifdef DEBUGMOVE
+                    char temp[32],
+                        boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
+                    int count = 0;
 #endif
 
-                int *moveMatchs = (isCannon
-                                       ? (isCol ? CannonColCanMove[index] : CannonRowCanMove[index])
-                                       : (isCol ? RookColCanMove[index] : RookRowCanMove[index]));
-                for (int state = 0; state < stateTotal; ++state)
-                {
-                    if (!HasPiece(state, index)) // 本状态curColOrRow位置无棋子，置0后继续
-                        continue;
+                    Board *moveMatchs = (isCannon
+                                             ? (isCol ? CannonColCanMove[boardIndex] : CannonRowCanMove[boardIndex])
+                                             : (isCol ? RookColCanMove[boardIndex] : RookRowCanMove[boardIndex]));
+                    for (int state = 0; state < stateTotal; ++state)
+                    {
+                        // 本状态当前行或列位置无棋子
+                        if (!HasPiece(state, inIndex))
+                            continue;
 
-                    int match = getRowColMatch(state, index, isCannon, isCol);
-                    if (match == 0)
-                        continue;
+                        int match = getMatch(state, outIndex, inIndex, isCannon, isCol);
+                        if (match == 0)
+                            continue;
 
-                    moveMatchs[state] = match;
-#ifdef DEBUGMOVE2
-                    printf(getRowColBit(temp, state, isCol));
-                    printf(getRowColBit(temp, moveMatchs[state], isCol));
-                    if (count % 5 == 4)
-                        printf("\n");
-                    else if (state != stateTotal - 1)
-                        printf("| ");
+                        moveMatchs[state] = match;
+#ifdef DEBUGMOVE
+                        count++;
+#endif
+                    }
+#ifdef DEBUGMOVE
+                    printf("printRookCannonCanMove:\nFormat:[state][match] %s, %s: %s\n",
+                           isCannon ? "Cannon" : "Rook",
+                           isCol ? "Col" : "Row",
+                           getRowColBit(temp, INTBITAT(inIndex), isCol));
+                    getBoardStr(boardStr, moveMatchs, count, BOARDCOLNUM, false);
+                    printf("state:%s\n%s\n", getRowColBit(temp, state, isCol), boardStr);
 
                     count++;
 #endif
-                }
 
-#ifdef DEBUGMOVE2
-                printf("\ncount: %d\n\n", count);
+#ifdef DEBUGMOVE
+                    printf("\ncount: %d\n\n", count);
 #endif
+                    ++boardIndex;
+                }
             }
         }
     }
@@ -204,5 +220,5 @@ static void initRookCannonRowColMove()
 
 void initPieceCanMove()
 {
-    initRookCannonRowColMove();
+    initRookCannonCanMove();
 }

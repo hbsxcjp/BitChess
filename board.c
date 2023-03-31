@@ -181,25 +181,20 @@ static int getHighNonZeroIndex(Board board)
     return index;
 }
 
-static ChessPosition *calChessPosition(ChessPosition *chess)
+static ChessPosition *calculateChessPosition(ChessPosition *chess)
 {
-    Board rorate90 = 0,
-          allBoard = chess->calPieces[ALLCOLOR] = chess->calPieces[RED] | chess->calPieces[BLACK];
+    Board rotatePieces = 0,
+          allBoard = chess->calPieces[RED] | chess->calPieces[BLACK];
 
+    chess->calPieces[ALLCOLOR] = allBoard;
     // 更新旋转位棋盘
-    for (int col = 0; col < BOARDCOLNUM; ++col)
+    for (int index = 0; index < BOARDLENGTH; ++index)
     {
-        Board colBoard = 0;
-        for (int row = 0; row < BOARDROWNUM; ++row)
-        {
-            if (allBoard & BoardMask[INDEXFROMROWCOL(row, col)])
-                colBoard |= BoardMask[row];
-        }
-
-        rorate90 |= colBoard << (col * BOARDROWNUM);
+        if (allBoard & BoardMask[index])
+            rotatePieces |= BoardMask[Rotate[index]];
     }
 
-    chess->rorate90 = rorate90;
+    chess->rotatePieces = rotatePieces;
     return chess;
 }
 
@@ -220,7 +215,7 @@ ChessPosition *getChessPositionFromFen(ChessPosition *chess, const char *fen)
         for (Kind kind = KING; kind <= PAWN; ++kind)
             chess->calPieces[color] |= chess->pieces[color][kind];
 
-    return calChessPosition(chess);
+    return calculateChessPosition(chess);
 }
 
 char *getFenFromChessPosition(char *fen, const ChessPosition *chess)
@@ -264,7 +259,7 @@ ChessPosition *doMoveChessPosition(ChessPosition *chess, Color color, Kind kind,
     for (Kind toKind = KING; toKind <= PAWN; ++toKind)
         chess->pieces[toColor][toKind] ^= BoardMask[toIndex];
 
-    return calChessPosition(chess);
+    return calculateChessPosition(chess);
 }
 
 static char *getChessPositionStr(char *chessStr, const ChessPosition *chess)
@@ -287,8 +282,8 @@ static char *getChessPositionStr(char *chessStr, const ChessPosition *chess)
     getBoardStr(temp, chess->calPieces, COLORNUM + 1, KINDNUM, false);
     strcat(chessStr, temp);
 
-    strcat(chessStr, "rorate90: \n");
-    getBoardStr(temp, &chess->rorate90, 1, KINDNUM, true);
+    strcat(chessStr, "rotatePieces: \n");
+    getBoardStr(temp, &chess->rotatePieces, 1, KINDNUM, true);
     strcat(chessStr, temp);
 
     return chessStr;
