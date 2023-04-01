@@ -100,9 +100,15 @@ extern Board PiecePut[KINDNUM];
 
 extern Board PieceMove[KINDNUM][BOARDLENGTH];
 
+bool isValidKing(int row, int col);
+
+bool isValidAdvisor(int row, int col);
+
+bool isValidBishop(int row, int col);
+
 char *getRowColBit(char *bitStr, int value, bool isCol);
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRotate);
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool showZero, bool isCol);
 
 void initData();
 

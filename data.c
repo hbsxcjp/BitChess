@@ -25,9 +25,21 @@ static int getIndexFromSeat(Seat seat)
     return INDEXFROMROWCOL(seat.row, seat.col);
 }
 
-static bool isValidKing(int frow, int fcol)
+bool isValidKing(int row, int col)
 {
-    return (frow < 3 || frow > 6) && (fcol > 2 && fcol < 6);
+    return (row < 3 || row > 6) && (col > 2 && col < 6);
+}
+
+bool isValidAdvisor(int row, int col)
+{
+    return (((row == 0 || row == 2 || row == 7 || row == 9) && (col == 3 || col == 5)) ||
+            ((row == 1 || row == 8) && col == 4));
+}
+
+bool isValidBishop(int row, int col)
+{
+    return (((row == 0 || row == 4 || row == 5 || row == 9) && (col == 2 || col == 6)) ||
+            ((row == 2 || row == 7) && (col == 0 || col == 4 || col == 8)));
 }
 
 static int getKingMoveTo(int toIndex[], int frow, int fcol)
@@ -58,11 +70,6 @@ static int getKingMoveTo(int toIndex[], int frow, int fcol)
     return count;
 }
 
-static bool isValidAdvisor(int frow, int fcol)
-{
-    return (((frow == 0 || frow == 2 || frow == 7 || frow == 9) && (fcol == 3 || fcol == 5)) || ((frow == 1 || frow == 8) && fcol == 4));
-}
-
 static int getAdvisorMoveTo(int toIndex[], int frow, int fcol)
 {
     int count = 0;
@@ -85,11 +92,6 @@ static int getAdvisorMoveTo(int toIndex[], int frow, int fcol)
             toIndex[count++] = getIndexFromSeat(tseats[i]);
 
     return count;
-}
-
-static bool isValidBishop(int frow, int fcol)
-{
-    return (((frow == 0 || frow == 4 || frow == 5 || frow == 9) && (fcol == 2 || fcol == 6)) || ((frow == 2 || frow == 7) && (fcol == 0 || fcol == 4 || fcol == 8)));
 }
 
 static int getBishopMoveTo(int toIndex[], int frow, int fcol)
@@ -327,20 +329,32 @@ char *getRowColBit(char *bitStr, int value, bool isCol)
     return bitStr;
 }
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool isRotate)
+char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool showZero, bool isCol)
 {
     if (length < colNum)
         colNum = length;
 
-    char temp[16],
+    char temp[64],
         indexRowStr[colNum * 16],
         nullRowStr[colNum * 16];
     strcpy(nullRowStr, "  ");
     for (int col = 0; col < colNum; ++col)
-        strcat(nullRowStr, isRotate ? " 0123456789" : " ABCDEFGHI");
+        strcat(nullRowStr, isCol ? " 0123456789" : " ABCDEFGHI");
     strcat(nullRowStr, "\n");
 
     strcpy(boardStr, "");
+    Board nonZeroBoards[length];
+    if (!showZero)
+    {
+        int count = 0;
+        for (int index = 0; index < length; ++index)
+        {
+            if (boards[index])
+                nonZeroBoards[count++] = boards[index];
+        }
+        boards = nonZeroBoards;
+        length = count;
+    }
     for (int index = 0; index < length; index += colNum)
     {
         strcpy(indexRowStr, "   ");
@@ -353,29 +367,28 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, b
         strcat(boardStr, indexRowStr);
         strcat(boardStr, nullRowStr);
 
-        int totalRow = isRotate ? BOARDCOLNUM : BOARDROWNUM,
-            totalCol = !isRotate ? BOARDCOLNUM : BOARDROWNUM,
-            mode = !isRotate ? 0x1FF : 0x3FF;
+        int totalRow = isCol ? BOARDCOLNUM : BOARDROWNUM,
+            totalCol = !isCol ? BOARDCOLNUM : BOARDROWNUM,
+            mode = !isCol ? 0x1FF : 0x3FF;
         for (int row = 0; row < totalRow; ++row)
         {
-            if (isRotate)
+            if (isCol)
                 snprintf(temp, 16, "%c: ", 'A' + row);
             else
                 snprintf(temp, 16, "%d: ", row);
             strcat(boardStr, temp);
-            for (int col = 0; col < colNum; ++col)
+            for (int col = 0; col < colNum && index + col < length; ++col)
             {
                 int rowOrCol = (boards[index + col] >> (row * totalCol)) & mode;
-                if (isRotate)
-                    snprintf(temp, 16, BINARYPATTERN10, BYTEBINARY10(rowOrCol));
-                else
-                    snprintf(temp, 16, BINARYPATTERN9, BYTEBINARY9(rowOrCol));
+                getRowColBit(temp, rowOrCol, isCol);
                 strcat(boardStr, temp);
             }
             strcat(boardStr, "\n");
         }
         // strcat(boardStr, "\n");
     }
+    snprintf(temp, 32, "count: %d\n", length);
+    strcat(boardStr, temp);
 
     return boardStr;
 }
@@ -403,15 +416,15 @@ void printData()
     }
     printf("%s\n", boardStr);
 
-    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, false);
+    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, true, false);
     printf("testBoardMask:\n%s\n", boardStr);
 
-    getBoardStr(boardStr, PiecePut, KINDNUM, KINDNUM, false);
+    getBoardStr(boardStr, PiecePut, KINDNUM, KINDNUM, true, false);
     printf("testPiecePut:\n%s\n", boardStr);
 
     for (int kind = 0; kind < KINDNUM; ++kind)
     {
-        getBoardStr(boardStr, PieceMove[kind], BOARDLENGTH, BOARDCOLNUM, false);
+        getBoardStr(boardStr, PieceMove[kind], BOARDLENGTH, BOARDCOLNUM, true, false);
         printf("testPieceMove kind: %d\n%s\n", kind, boardStr);
     }
 }

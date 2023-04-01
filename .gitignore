@@ -1,6 +1,6 @@
 *.~*
 test
-.vscode/*
+.vscode/
 
 # Prerequisites
 *.d
@@ -61,3 +61,4 @@ dkms.conf
 .vscode/c_cpp_properties.json
 
 .fake
+.vscode/c_cpp_properties.json

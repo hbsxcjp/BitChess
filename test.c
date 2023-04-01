@@ -15,7 +15,7 @@ int main()
 {
     setlocale(LC_ALL, "zh_CN");
     // Test data.c
-    // initData();
+    initData();
     // printData();
 
     // Test board.c

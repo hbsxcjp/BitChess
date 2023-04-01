@@ -7,20 +7,27 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define DEBUGINITCANMOVE
+// #define DEBUGROOKCANNON1
+// #define DEBUGROOKCANNON2
+#define DEBUGKNIGHT
+#define DEBUGBISHOP
 
-#define ROWSTATEMAX (1 << (BOARDCOLNUM - 1))
-#define COLSTATEMAX (1 << (BOARDROWNUM - 1))
+#define LEGCOUNT 4
+#define ROWSTATEMAX (1 << BOARDCOLNUM)
+#define COLSTATEMAX (1 << BOARDROWNUM)
 #define ROWBASEOFFSET(row) ((row)*BOARDCOLNUM)
 #define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
-#define ROWOFFSET(row, col) (ROWBASEOFFSET(row) + (col))
-#define COLOFFSET(col, row) (COLBASEOFFSET(col) + (row))
+// #define ROWOFFSET(row, col) (ROWBASEOFFSET(row) + (col))
+// #define COLOFFSET(col, row) (COLBASEOFFSET(col) + (row))
 
 // 车炮处于每个位置的每种位置状态可移动位棋盘
 static Board RookRowCanMove[BOARDCOLNUM][ROWSTATEMAX];
 static Board RookColCanMove[BOARDROWNUM][COLSTATEMAX];
 static Board CannonRowCanMove[BOARDCOLNUM][ROWSTATEMAX];
 static Board CannonColCanMove[BOARDROWNUM][COLSTATEMAX];
+
+static Board KnightCanMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
+static Board BishopCanMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
 
 // // 通过二分搜索计算右侧的连续零位（尾随）
 // static unsigned int getLowNonZeroIndexFromUInt(unsigned int value)
@@ -154,11 +161,11 @@ static void initRookCannonCanMove()
         bool isCannon = kind == CANNON;
         for (int isCol = 0; isCol < 2; ++isCol)
         {
-            int stateTotal = (isCol ? COLSTATEMAX : ROWSTATEMAX) << 1,
+            int stateTotal = isCol ? COLSTATEMAX : ROWSTATEMAX,
                 length = isCol ? BOARDROWNUM : BOARDCOLNUM;
             for (int rowCloIndex = 0; rowCloIndex < length; ++rowCloIndex)
             {
-#ifdef DEBUGINITCANMOVE
+#ifdef DEBUGROOKCANNON1
                 char temp[32], temp2[32];
                 int count = 0;
                 printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
@@ -195,49 +202,183 @@ static void initRookCannonCanMove()
                     }
                     else
                         moveMatchs[state] = match;
-#ifdef DEBUGINITCANMOVE
+#ifdef DEBUGROOKCANNON1
                     printf("%s %s", getRowColBit(temp, state, isCol), getRowColBit(temp2, match, isCol));
-                    if (count % 8 == 7)
+                    if (count % 5 == 4)
                         printf("\n");
                     else if (count != (stateTotal >> 1) - 1)
                         printf(" | ");
                     count++;
 #endif
                 }
-#ifdef DEBUGINITCANMOVE
-                // printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
-                //     isCannon ? "Cannon" : "Rook",
-                //     isCol ? "Col" : "Row",
-                //     getRowColBit(temp, INTBITAT(rowCloIndex), isCol));
-
-                // char boardStr[count * (BOARDROWNUM + 2) * 16];
-                // getBoardStr(boardStr, moveMatchs, count, BOARDCOLNUM, false);
-                // printf("%s\ncount: %d\n\n", boardStr, count);
+#ifdef DEBUGROOKCANNON1
                 printf("count: %d\n\n", count);
+#endif
+
+#ifdef DEBUGROOKCANNON2
+                char temp[32];
+                printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
+                       isCannon ? "Cannon" : "Rook",
+                       isCol ? "Col" : "Row",
+                       getRowColBit(temp, INTBITAT(rowCloIndex), isCol));
+
+                char boardStr[stateTotal * (BOARDROWNUM + 2) * 16];
+                getBoardStr(boardStr, moveMatchs, stateTotal, BOARDCOLNUM, false, false);
+                printf("%s\n", boardStr);
 #endif
             }
         }
     }
 }
 
+static void initKinghtCanMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index)
+    {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        for (int state = 0; state < INTBITAT(LEGCOUNT); ++state)
+        {
+            if (row == 0)
+                state |= INTBITAT(LEGCOUNT - 1);
+            else if (row == BOARDROWNUM - 1)
+                state |= INTBITAT(LEGCOUNT - 4);
+            if (col == 0)
+                state |= INTBITAT(LEGCOUNT - 2);
+            else if (col == BOARDCOLNUM - 1)
+                state |= INTBITAT(LEGCOUNT - 3);
+
+            Board match = 0;
+            if (!(state & INTBITAT(LEGCOUNT - 1)) && row > 1)
+            {
+                if (col > 0)
+                    match |= BoardMask[index - 2 * BOARDCOLNUM - 1];
+                if (col < BOARDCOLNUM - 1)
+                    match |= BoardMask[index - 2 * BOARDCOLNUM + 1];
+            }
+            if (!(state & INTBITAT(LEGCOUNT - 2)) && col > 1)
+            {
+                if (row > 0)
+                    match |= BoardMask[index - 2 - BOARDCOLNUM];
+                if (row < BOARDROWNUM - 1)
+                    match |= BoardMask[index - 2 + BOARDCOLNUM];
+            }
+            if (!(state & INTBITAT(LEGCOUNT - 3)) && col < BOARDCOLNUM - 2)
+            {
+                if (row > 0)
+                    match |= BoardMask[index + 2 - BOARDCOLNUM];
+                if (row < BOARDROWNUM - 1)
+                    match |= BoardMask[index + 2 + BOARDCOLNUM];
+            }
+            if (!(state & INTBITAT(LEGCOUNT - 4)) && row < BOARDROWNUM - 2)
+            {
+                if (col > 0)
+                    match |= BoardMask[index + 2 * BOARDCOLNUM - 1];
+                if (col < BOARDCOLNUM - 1)
+                    match |= BoardMask[index + 2 * BOARDCOLNUM + 1];
+            }
+
+            KnightCanMove[index][state] = match;
+        }
+    }
+}
+
+static void initBishopCanMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index)
+    {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        if (!isValidBishop(row, col))
+            continue;
+
+        for (int state = 0; state < INTBITAT(LEGCOUNT); ++state)
+        {
+            if (row == 0 || row == 5)
+                state |= (INTBITAT(LEGCOUNT - 1) | INTBITAT(LEGCOUNT - 4));
+            else if (row == 4 || row == BOARDROWNUM - 1)
+                state |= (INTBITAT(LEGCOUNT - 2) | INTBITAT(LEGCOUNT - 3));
+            if (col == 0)
+                state |= INTBITAT(LEGCOUNT - 2);
+            else if (col == BOARDCOLNUM - 1)
+                state |= INTBITAT(LEGCOUNT - 3);
+
+            Board match = 0;
+            if (!(state & INTBITAT(LEGCOUNT - 1)))
+                match |= BoardMask[index - 2 * BOARDCOLNUM - 2];
+
+            if (!(state & INTBITAT(LEGCOUNT - 2)))
+                match |= BoardMask[index - 2 * BOARDCOLNUM + 2];
+
+            if (!(state & INTBITAT(LEGCOUNT - 3)))
+                match |= BoardMask[index + 2 * BOARDCOLNUM - 2];
+
+            if (!(state & INTBITAT(LEGCOUNT - 4)))
+                match |= BoardMask[index + 2 * BOARDCOLNUM + 2];
+
+            BishopCanMove[index][state] = match;
+        }
+
+#ifdef DEBUGBISHOP
+        printf("printBishopCanMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
+
+        char boardStr[INTBITAT(LEGCOUNT) * (BOARDROWNUM + 2) * 16];
+        getBoardStr(boardStr, BishopCanMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
+        printf("%s\n", boardStr);
+#endif
+    }
+}
+
 void initPieceCanMove()
 {
     initRookCannonCanMove();
-}
-
-static Board commonGetRookCannonCanMove(int row, int col, Board allPieces, Board rotatePieces,
-                                        Board rowCanMove[BOARDCOLNUM][ROWSTATEMAX], Board colCanMove[BOARDROWNUM][COLSTATEMAX])
-{
-    int rowOffset = ROWBASEOFFSET(row);
-    return ((rowCanMove[col][(allPieces >> rowOffset) & 0x1FF] << rowOffset) | (colCanMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
+    // initKinghtCanMove();
+    initBishopCanMove();
 }
 
 Board getRookCannonCanMove(bool isCannon, int fromIndex, Board allPieces, Board rotatePieces)
 {
     Seat fromSeat = Seats[fromIndex];
-    int row = fromSeat.row, col = fromSeat.col;
+    int row = fromSeat.row, col = fromSeat.col,
+        rowOffset = ROWBASEOFFSET(row);
     Board(*rowCanMove)[ROWSTATEMAX] = isCannon ? CannonRowCanMove : RookRowCanMove;
     Board(*colCanMove)[COLSTATEMAX] = isCannon ? CannonColCanMove : RookColCanMove;
 
-    return commonGetRookCannonCanMove(row, col, allPieces, rotatePieces, rowCanMove, colCanMove);
+    return ((rowCanMove[col][(allPieces >> rowOffset) & 0x1FF] << rowOffset) |
+            (colCanMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
+}
+
+Board getKnightCanMove(int fromIndex, Board allPieces)
+{
+    Seat fromSeat = Seats[fromIndex];
+    int row = fromSeat.row, col = fromSeat.col;
+    int state = (((row > 0 ? allPieces & BoardMask[fromIndex - BOARDCOLNUM] : 0x1) << (LEGCOUNT - 1)) |
+                 ((col > 0 ? allPieces & BoardMask[fromIndex - 1] : 0x1) << (LEGCOUNT - 2)) |
+                 ((col < BOARDCOLNUM - 1 ? allPieces & BoardMask[fromIndex + 1] : 0x1) << (LEGCOUNT - 3)) |
+                 ((row < BOARDROWNUM - 1 ? allPieces & BoardMask[fromIndex + BOARDCOLNUM] : 0x1) << (LEGCOUNT - 4)));
+
+    return KnightCanMove[fromIndex][state];
+}
+
+Board getBishopCanMove(int fromIndex, Board allPieces)
+{
+    Seat fromSeat = Seats[fromIndex];
+    int row = fromSeat.row, col = fromSeat.col;
+    int state = 0;
+    if (row != 0 && row != 5)
+    {
+        if (col > 0)
+            state |= (allPieces & BoardMask[fromIndex - BOARDCOLNUM - 1]) << (LEGCOUNT - 1);
+        if (col < BOARDCOLNUM - 1)
+            state |= (allPieces & BoardMask[fromIndex - BOARDCOLNUM + 1]) << (LEGCOUNT - 2);
+    }
+    if (row != 4 && row != BOARDROWNUM - 1)
+    {
+        if (col > 0)
+            state |= (allPieces & BoardMask[fromIndex + BOARDCOLNUM - 1]) << (LEGCOUNT - 3);
+        if (col < BOARDCOLNUM - 1)
+            state |= (allPieces & BoardMask[fromIndex + BOARDCOLNUM + 1]) << (LEGCOUNT - 4);
+    }
+
+    return BishopCanMove[fromIndex][state];
 }

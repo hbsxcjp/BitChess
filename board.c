@@ -252,17 +252,17 @@ static char* getChessPositionStr(char* chessStr, const ChessPosition* chess)
         snprintf(temp, 32, "chess->pieces[%s][Kind]:\n", colorStrs[!color]);
         strcat(chessStr, temp);
 
-        getBoardStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, false);
+        getBoardStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, true, false);
         strcat(chessStr, temp);
     }
 
     snprintf(temp, 128, "calPieces[Color]: \nRED:         BLACK:    ALLCOLOR:\n");
     strcat(chessStr, temp);
-    getBoardStr(temp, chess->calPieces, COLORNUM + 1, KINDNUM, false);
+    getBoardStr(temp, chess->calPieces, COLORNUM + 1, KINDNUM, true, false);
     strcat(chessStr, temp);
 
     strcat(chessStr, "rotatePieces: \n");
-    getBoardStr(temp, &chess->rotatePieces, 1, KINDNUM, true);
+    getBoardStr(temp, &chess->rotatePieces, 1, KINDNUM, true, true);
     strcat(chessStr, temp);
 
     return chessStr;
