@@ -320,9 +320,9 @@ void initData()
 char *getRowColBit(char *bitStr, int value, bool isCol)
 {
     if (isCol)
-        snprintf(bitStr, 32, BINARYPATTERN10, BYTEBINARY10(value));
+        snprintf(bitStr, 64, BINARYPATTERN10, BYTEBINARY10(value));
     else
-        snprintf(bitStr, 32, BINARYPATTERN9, BYTEBINARY9(value));
+        snprintf(bitStr, 64, BINARYPATTERN9, BYTEBINARY9(value));
 
     return bitStr;
 }

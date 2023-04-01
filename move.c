@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DEBUGINITCANMOVE
+// #define DEBUGINITCANMOVE
 
 #define ROWSTATEMAX (1 << (BOARDCOLNUM - 1))
 #define COLSTATEMAX (1 << (BOARDROWNUM - 1))
@@ -15,8 +15,6 @@
 #define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
 #define ROWOFFSET(row, col) (ROWBASEOFFSET(row) + (col))
 #define COLOFFSET(col, row) (COLBASEOFFSET(col) + (row))
-
-#define HasPiece(state, index) ((state) & (1 << (index)))
 
 // 车炮处于每个位置的每种位置状态可移动位棋盘
 static Board RookRowCanMove[BOARDCOLNUM][ROWSTATEMAX];
@@ -113,24 +111,32 @@ static Board CannonColCanMove[BOARDROWNUM][COLSTATEMAX];
 static int getMatch(int state, int rowColIndex, bool isCannon, bool isCol)
 {
     int match = 0;
-    for (int isHigh = 0; isHigh < 2; ++isHigh) {
+    for (int isHigh = 0; isHigh < 2; ++isHigh)
+    {
         int direction = isHigh ? 1 : -1,
             endIndex = isHigh ? (isCol ? BOARDROWNUM : BOARDCOLNUM) - 1 : 0; // 每行列数或每列行数
-        bool skip = false; // 炮是否已跳
-        for (int i = direction * (rowColIndex + direction); i <= endIndex; ++i) {
+        bool skip = false;                                                   // 炮是否已跳
+        for (int i = direction * (rowColIndex + direction); i <= endIndex; ++i)
+        {
             int index = direction * i;
-            bool hasPiece = HasPiece(state, index);
-            if (isCannon) {
-                if (!skip) {
+            bool hasPiece = INTBITHAS(state, index);
+            if (isCannon)
+            {
+                if (!skip)
+                {
                     if (hasPiece)
                         skip = true;
                     else
                         match |= INTBITAT(index);
-                } else if (hasPiece) {
+                }
+                else if (hasPiece)
+                {
                     match |= INTBITAT(index);
                     break;
                 }
-            } else {
+            }
+            else
+            {
                 match |= INTBITAT(index);
                 if (hasPiece) // 遇到棋子
                     break;
@@ -143,43 +149,51 @@ static int getMatch(int state, int rowColIndex, bool isCannon, bool isCol)
 
 static void initRookCannonCanMove()
 {
-    for (Kind kind = ROOK; kind <= CANNON; ++kind) {
+    for (Kind kind = ROOK; kind <= CANNON; ++kind)
+    {
         bool isCannon = kind == CANNON;
-        for (int isCol = 0; isCol < 2; ++isCol) {
+        for (int isCol = 0; isCol < 2; ++isCol)
+        {
             int stateTotal = (isCol ? COLSTATEMAX : ROWSTATEMAX) << 1,
                 length = isCol ? BOARDROWNUM : BOARDCOLNUM;
-            for (int rowCloIndex = 0; rowCloIndex < length; ++rowCloIndex) {
+            for (int rowCloIndex = 0; rowCloIndex < length; ++rowCloIndex)
+            {
 #ifdef DEBUGINITCANMOVE
                 char temp[32], temp2[32];
                 int count = 0;
                 printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
-                    isCannon ? "Cannon" : "Rook",
-                    isCol ? "Col" : "Row",
-                    getRowColBit(temp, INTBITAT(rowCloIndex), isCol));
+                       isCannon ? "Cannon" : "Rook",
+                       isCol ? "Col" : "Row",
+                       getRowColBit(temp, INTBITAT(rowCloIndex), isCol));
 #endif
 
-                Board* moveMatchs = (isCannon
-                        ? (isCol ? CannonColCanMove[rowCloIndex] : CannonRowCanMove[rowCloIndex])
-                        : (isCol ? RookColCanMove[rowCloIndex] : RookRowCanMove[rowCloIndex]));
-                for (int state = 0; state < stateTotal; ++state) {
+                Board *moveMatchs = (isCannon
+                                         ? (isCol ? CannonColCanMove[rowCloIndex] : CannonRowCanMove[rowCloIndex])
+                                         : (isCol ? RookColCanMove[rowCloIndex] : RookRowCanMove[rowCloIndex]));
+                for (int state = 0; state < stateTotal; ++state)
+                {
                     // 本状态当前行或列位置无棋子
-                    if (!HasPiece(state, rowCloIndex))
+                    if (!INTBITHAS(state, rowCloIndex))
                         continue;
 
                     int match = getMatch(state, rowCloIndex, isCannon, isCol);
-                    if (match == 0) {
+                    if (match == 0)
+                    {
                         // printf("match==0: %s %s", getRowColBit(temp, state, isCol), getRowColBit(temp2, match, isCol));
                         continue;
                     }
 
-                    if (isCol) {
+                    if (isCol)
+                    {
                         Board colMatch = 0;
-                        for (int row = 0; row < BOARDROWNUM; ++row) {
+                        for (int row = 0; row < BOARDROWNUM; ++row)
+                        {
                             if (match & INTBITAT(row))
                                 colMatch |= BoardMask[ROWBASEOFFSET(row)]; // 每行的首列置位
                         }
                         moveMatchs[state] = colMatch;
-                    } else
+                    }
+                    else
                         moveMatchs[state] = match;
 #ifdef DEBUGINITCANMOVE
                     printf("%s %s", getRowColBit(temp, state, isCol), getRowColBit(temp2, match, isCol));
@@ -212,11 +226,10 @@ void initPieceCanMove()
 }
 
 static Board commonGetRookCannonCanMove(int row, int col, Board allPieces, Board rotatePieces,
-    Board rowCanMove[BOARDCOLNUM][ROWSTATEMAX], Board colCanMove[BOARDROWNUM][COLSTATEMAX])
+                                        Board rowCanMove[BOARDCOLNUM][ROWSTATEMAX], Board colCanMove[BOARDROWNUM][COLSTATEMAX])
 {
     int rowOffset = ROWBASEOFFSET(row);
-    return ((rowCanMove[col][(allPieces >> rowOffset) & 0x1FF] << rowOffset)
-        | (colCanMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
+    return ((rowCanMove[col][(allPieces >> rowOffset) & 0x1FF] << rowOffset) | (colCanMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
 }
 
 Board getRookCannonCanMove(bool isCannon, int fromIndex, Board allPieces, Board rotatePieces)

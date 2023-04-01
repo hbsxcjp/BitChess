@@ -7,7 +7,9 @@
 #define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
 #define BOARDAT(i) ((Board)1 << (i))
 #define BOARDFROM(i, offset) ((Board)(i) << (offset))
+
 #define INTBITAT(i) (1 << (i))
+#define INTBITHAS(state, index) ((state)&INTBITAT(index))
 
 #define COLORNUM 2
 #define KINDNUM 7
