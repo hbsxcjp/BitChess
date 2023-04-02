@@ -14,12 +14,12 @@
 int main()
 {
     setlocale(LC_ALL, "zh_CN");
+
     // Test data.c
     initData();
-    // printData();
 
     // Test board.c
-    // printChessPosition();
+    testChessPosition();
 
     // Test move.c
 

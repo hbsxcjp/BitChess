@@ -3,12 +3,13 @@
 
 #include "data.h"
 
-ChessPosition *getChessPositionFromFen(ChessPosition *chess, const char *fen);
+ChessPosition* updateAllPieces(ChessPosition* chess);
 
-char *getFenFromChessPosition(char *fen, const ChessPosition *chess);
+ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen);
 
-ChessPosition *doMoveChessPosition(ChessPosition *chess, Color color, Kind kind, int fromIndex, int toIndex);
+char* getFenFromChessPosition(char* fen, const ChessPosition* chess);
 
-void printChessPosition();
+
+void testChessPosition();
 
 #endif /* BOARD_H */

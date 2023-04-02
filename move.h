@@ -3,6 +3,6 @@
 
 #include "data.h"
 
-
+ChessPosition* doMoveChessPosition(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex);
 
 #endif /* MOVE_H */

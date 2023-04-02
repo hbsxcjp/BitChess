@@ -17,40 +17,15 @@
 #define BOARDROWNUM 10
 #define BOARDCOLNUM 9
 #define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
-#define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
 
-#define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
-#define BINARYPATTERN10 "%c%c%c%c%c%c%c%c%c%c "
-
-#define BYTEBINARY9(i)            \
-    (((i)&0x01) ? '1' : '-'),     \
-        (((i)&0x02) ? '1' : '-'), \
-        (((i)&0x04) ? '1' : '-'), \
-        (((i)&0x08) ? '1' : '-'), \
-        (((i)&0x10) ? '1' : '-'), \
-        (((i)&0x20) ? '1' : '-'), \
-        (((i)&0x40) ? '1' : '-'), \
-        (((i)&0x80) ? '1' : '-'), \
-        (((i)&0x100) ? '1' : '-')
-
-#define BYTEBINARY10(i)            \
-    (((i)&0x01) ? '1' : '-'),      \
-        (((i)&0x02) ? '1' : '-'),  \
-        (((i)&0x04) ? '1' : '-'),  \
-        (((i)&0x08) ? '1' : '-'),  \
-        (((i)&0x10) ? '1' : '-'),  \
-        (((i)&0x20) ? '1' : '-'),  \
-        (((i)&0x40) ? '1' : '-'),  \
-        (((i)&0x80) ? '1' : '-'),  \
-        (((i)&0x100) ? '1' : '-'), \
-        (((i)&0x200) ? '1' : '-')
 
 typedef __uint128_t Board; // 只使用最低的90位
 
 typedef enum Color {
     RED,
     BLACK,
-    ALLCOLOR
+    ALLCOLOR,
+    ROTATE
 } Color;
 
 typedef enum Kind {
@@ -81,21 +56,20 @@ typedef struct ChessPosition {
     Board pieces[COLORNUM][KINDNUM];
 
     // 计算中间存储数据(基本局面改动时更新)
-    Board calPieces[COLORNUM + 1];
-    Board rotatePieces;
+    Board calPieces[ROTATE + 1];
 } ChessPosition;
 
 extern Seat Seats[BOARDLENGTH];
-
 extern int Rotate[BOARDLENGTH];
 
 extern Board BoardMask[BOARDLENGTH];
+extern Board KingMove[BOARDLENGTH];
+extern Board AdvisorMove[BOARDLENGTH];
+extern Board PawnMove[BOARDLENGTH][2];
 
-void initData();
+// Board getKingMove(int fromIndex);return KingMove[fromIndex];
 
-Board getKingMove(int fromIndex);
-
-Board getAdvisorMove(int fromIndex);
+// Board getAdvisorMove(int fromIndex);return AdvisorMove[fromIndex];
 
 Board getBishopMove(int fromIndex, Board allPieces);
 
@@ -103,12 +77,12 @@ Board getKnightMove(int fromIndex, Board allPieces);
 
 Board getRookCannonMove(bool isCannon, int fromIndex, Board allPieces, Board rotatePieces);
 
-Board getPawnMove(int fromIndex, bool isBottom);
+// Board getPawnMove(int fromIndex, bool isBottom);return PawnMove[fromIndex][isBottom];
 
-char* getRowColBit(char* bitStr, int value, bool isCol);
+char* getIntBitStr(char* bitStr, int value, bool isCol);
 
 char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol);
 
-void printData();
+void initData();
 
 #endif /* DATA_H */

@@ -20,7 +20,7 @@ static const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNB
 
 static const wchar_t Names[COLORNUM][KINDNUM] = { L"帅仕相马车炮兵", L"将士象马车炮卒" };
 
-// static const wchar_t NumChar[COLORNUM][BOARDCOLNUM] = {L"一二三四五六七八九", L"１２３４５６７８９"};
+// static const wchar_t NumChar[COLORNUM][BOARDCOLNUM] = { L"一二三四五六七八九", L"１２３４５６７８９" };
 
 // static const wchar_t PreChar[] = L"前中后";
 
@@ -166,7 +166,7 @@ static int getHighNonZeroIndex(Board board)
     return index;
 }
 
-static ChessPosition* calculateChessPosition(ChessPosition* chess)
+ChessPosition* updateAllPieces(ChessPosition* chess)
 {
     Board rotatePieces = 0,
           allPieces = chess->calPieces[RED] | chess->calPieces[BLACK];
@@ -178,7 +178,7 @@ static ChessPosition* calculateChessPosition(ChessPosition* chess)
             rotatePieces |= BoardMask[Rotate[index]];
     }
 
-    chess->rotatePieces = rotatePieces;
+    chess->calPieces[ROTATE] = rotatePieces;
     return chess;
 }
 
@@ -198,7 +198,7 @@ ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen)
         for (Kind kind = KING; kind <= PAWN; ++kind)
             chess->calPieces[color] |= chess->pieces[color][kind];
 
-    return calculateChessPosition(chess);
+    return updateAllPieces(chess);
 }
 
 char* getFenFromChessPosition(char* fen, const ChessPosition* chess)
@@ -224,26 +224,20 @@ char* getFenFromChessPosition(char* fen, const ChessPosition* chess)
     return getFenFromPieChars(fen, pieChars);
 }
 
-ChessPosition* doMoveChessPosition(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex)
-{
-    chess->player = !chess->player;
-
-    // 清除原位置，置位新位置
-    Board moveBoard = BoardMask[fromIndex] | BoardMask[toIndex];
-    chess->calPieces[color] ^= moveBoard;
-    chess->pieces[color][kind] ^= moveBoard;
-
-    // 清除新位置
-    Color toColor = !color;
-    chess->calPieces[toColor] ^= BoardMask[toIndex];
-    for (Kind toKind = KING; toKind <= PAWN; ++toKind)
-        chess->pieces[toColor][toKind] ^= BoardMask[toIndex];
-
-    return calculateChessPosition(chess);
-}
 
 static char* getChessPositionStr(char* chessStr, const ChessPosition* chess)
 {
+    static const char* BoardStr = "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n";
+
     const char* colorStrs[] = { "RED", "BLACK" };
     char temp[KINDNUM * (BOARDROWNUM + 2) * 16];
     snprintf(temp, 128, "player: %s\n", colorStrs[chess->player]);
@@ -258,30 +252,15 @@ static char* getChessPositionStr(char* chessStr, const ChessPosition* chess)
 
     snprintf(temp, 128, "calPieces[Color]: \nRED:         BLACK:    ALLCOLOR:\n");
     strcat(chessStr, temp);
-    getBoardStr(temp, chess->calPieces, COLORNUM + 1, KINDNUM, true, false);
+    getBoardStr(temp, chess->calPieces, ALLCOLOR + 1, KINDNUM, true, false);
     strcat(chessStr, temp);
 
-    strcat(chessStr, "rotatePieces: \n");
-    getBoardStr(temp, &chess->rotatePieces, 1, KINDNUM, true, true);
+    strcat(chessStr, "ROTATE: \n");
+    getBoardStr(temp, &chess->calPieces[ROTATE], 1, KINDNUM, true, true);
     strcat(chessStr, temp);
 
-    return chessStr;
-}
-
-char* getChessPositionBoardStr(char* boardStr, const ChessPosition* chess)
-{
-    static const char* BoardStr = "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n";
-
-    strcpy(boardStr, BoardStr);
+    strcat(chessStr, "chessBoardStr:\n");
+    strcpy(temp, BoardStr);
     for (Color color = RED; color <= BLACK; ++color) {
         int (*getNonZeroIndex)(Board) = color == BLACK ? getHighNonZeroIndex : getLowNonZeroIndex;
         for (Kind kind = KING; kind <= PAWN; ++kind) {
@@ -290,17 +269,18 @@ char* getChessPositionBoardStr(char* boardStr, const ChessPosition* chess)
             while (board) {
                 int index = getNonZeroIndex(board);
                 Seat seat = Seats[index];
-                boardStr[seat.row * (BOARDCOLNUM + 1) + seat.col] = ch;
+                temp[seat.row * (BOARDCOLNUM + 1) + seat.col] = ch;
 
                 board ^= BoardMask[index];
             }
         }
     }
+    strcat(chessStr, temp);
 
-    return boardStr;
+    return chessStr;
 }
 
-void printChessPosition()
+void testChessPosition()
 {
 
     const char* fens[] = {
@@ -320,17 +300,13 @@ void printChessPosition()
             pieChars, afen, fen, strcmp(fen, afen));
 
         char chessStr[4 * 4096],
-            chessBoardStr[512],
             setFen[BOARDLENGTH];
         ChessPosition chess = {};
         getChessPositionFromFen(&chess, afen);
-
         getChessPositionStr(chessStr, &chess);
-        getChessPositionBoardStr(chessBoardStr, &chess);
-
         getFenFromChessPosition(setFen, &chess);
 
-        printf("printChessPosition:\n%schessBoardStr:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n\n",
-            chessStr, chessBoardStr, afen, setFen, strcmp(setFen, afen));
+        printf("testChessPosition:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n\n",
+            chessStr, afen, setFen, strcmp(setFen, afen));
     }
 }
