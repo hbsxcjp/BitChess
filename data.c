@@ -22,8 +22,8 @@
 // #define COLOFFSET(col, row) (COLBASEOFFSET(col) + (row))
 
 Seat Seats[BOARDLENGTH];
-Board BoardMask[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
+Board BoardMask[BOARDLENGTH];
 
 // 帅仕根据所处的位置选取可移动位棋盘
 static Board KingMove[BOARDLENGTH];
@@ -71,13 +71,14 @@ static void initBaseData()
     for (int row = 0; row < BOARDROWNUM; ++row) {
         for (int col = 0; col < BOARDCOLNUM; ++col) {
             Seats[index] = (Seat) { row, col };
-            BoardMask[index] = BOARDAT(index);
             Rotate[index] = col * BOARDROWNUM + row;
+            BoardMask[index] = BOARDAT(index);
 
             ++index;
         }
     }
 
+#ifdef DEBUGBASEDATA
     char temp[64],
         boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
     strcpy(boardStr, "Seats[90]:\n");
@@ -88,7 +89,7 @@ static void initBaseData()
             strcat(boardStr, "\n");
     }
 
-    strcat(boardStr, "Rotate[90]:\n");
+    strcat(boardStr, "\nRotate[90]:\n");
     for (int i = 0; i < BOARDLENGTH; ++i) {
         snprintf(temp, 64, "%3d", Rotate[i]);
         strcat(boardStr, temp);
@@ -99,6 +100,7 @@ static void initBaseData()
 
     getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, true, false);
     printf("testBoardMask:\n%s\n", boardStr);
+#endif
 }
 
 static void initKingMove()
