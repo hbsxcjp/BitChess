@@ -47,15 +47,13 @@
 
 typedef __uint128_t Board; // 只使用最低的90位
 
-typedef enum Color
-{
+typedef enum Color {
     RED,
     BLACK,
     ALLCOLOR
 } Color;
 
-typedef enum Kind
-{
+typedef enum Kind {
     KING,
     ADVISOR,
     BISHOP,
@@ -65,20 +63,17 @@ typedef enum Kind
     PAWN
 } Kind;
 
-typedef struct ColorKind
-{
+typedef struct ColorKind {
     Color color;
     Kind kind;
 } ColorKind;
 
-typedef struct Seat
-{
+typedef struct Seat {
     int row;
     int col;
 } Seat;
 
-typedef struct ChessPosition
-{
+typedef struct ChessPosition {
     // 当前
     Color player;
 
@@ -96,21 +91,23 @@ extern int Rotate[BOARDLENGTH];
 
 extern Board BoardMask[BOARDLENGTH];
 
-extern Board PiecePut[KINDNUM];
-
-extern Board PieceMove[KINDNUM][BOARDLENGTH];
-
-bool isValidKing(int row, int col);
-
-bool isValidAdvisor(int row, int col);
-
-bool isValidBishop(int row, int col);
-
-char *getRowColBit(char *bitStr, int value, bool isCol);
-
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool showZero, bool isCol);
-
 void initData();
+
+Board getKingMove(int fromIndex);
+
+Board getAdvisorMove(int fromIndex);
+
+Board getBishopMove(int fromIndex, Board allPieces);
+
+Board getKnightMove(int fromIndex, Board allPieces);
+
+Board getRookCannonMove(bool isCannon, int fromIndex, Board allPieces, Board rotatePieces);
+
+Board getPawnMove(int fromIndex, bool isBottom);
+
+char* getRowColBit(char* bitStr, int value, bool isCol);
+
+char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol);
 
 void printData();
 

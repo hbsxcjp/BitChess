@@ -4,287 +4,73 @@
 #include <stdio.h>
 #include <string.h>
 
-Seat Seats[BOARDLENGTH];
+#define DEBUGBASEDATA
+// #define DEBUGKING
+// #define DEBUGADVISOR
+// #define DEBUGBISHOP
+// #define DEBUGKNIGHT
+// #define DEBUGROOKCANNON1
+// #define DEBUGROOKCANNON2
+// #define DEBUGPAWN
 
+#define LEGCOUNT 4
+#define ROWSTATEMAX (1 << BOARDCOLNUM)
+#define COLSTATEMAX (1 << BOARDROWNUM)
+#define ROWBASEOFFSET(row) ((row)*BOARDCOLNUM)
+#define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
+// #define ROWOFFSET(row, col) (ROWBASEOFFSET(row) + (col))
+// #define COLOFFSET(col, row) (COLBASEOFFSET(col) + (row))
+
+Seat Seats[BOARDLENGTH];
+Board BoardMask[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
 
-Board BoardMask[BOARDLENGTH];
+// 帅仕根据所处的位置选取可移动位棋盘
+static Board KingMove[BOARDLENGTH];
+static Board AdvisorMove[BOARDLENGTH];
 
-Board PiecePut[KINDNUM];
+// 马相根据憋马腿或田心组成的四个位置状态选取可移动位棋盘
+static Board BishopMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
+static Board KnightMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
 
-Board PieceMove[KINDNUM][BOARDLENGTH];
+// 车炮根据每行和每列的位置状态选取可移动位棋盘
+static Board RookRowMove[BOARDCOLNUM][ROWSTATEMAX];
+static Board RookColMove[BOARDROWNUM][COLSTATEMAX];
+static Board CannonRowMove[BOARDCOLNUM][ROWSTATEMAX];
+static Board CannonColMove[BOARDROWNUM][COLSTATEMAX];
 
-typedef bool IsValid(int frow, int fcol);
+// 兵根据本方处于上或下的二个位置状态选取可移动位棋盘
+static Board PawnMove[BOARDLENGTH][2];
 
-typedef int GetMoveTo(int toIndex[], int frow, int fcol);
-
-bool isValid(int frow, int fcol) { return true; } // 所有位置均有效
-
-static int getIndexFromSeat(Seat seat)
-{
-    return INDEXFROMROWCOL(seat.row, seat.col);
-}
-
-bool isValidKing(int row, int col)
+static bool isValidKing(int row, int col)
 {
     return (row < 3 || row > 6) && (col > 2 && col < 6);
 }
 
-bool isValidAdvisor(int row, int col)
+static bool isValidAdvisor(int row, int col)
 {
-    return (((row == 0 || row == 2 || row == 7 || row == 9) && (col == 3 || col == 5)) ||
-            ((row == 1 || row == 8) && col == 4));
+    return (((row == 0 || row == 2 || row == 7 || row == 9) && (col == 3 || col == 5))
+        || ((row == 1 || row == 8) && col == 4));
 }
 
-bool isValidBishop(int row, int col)
+static bool isValidBishop(int row, int col)
 {
-    return (((row == 0 || row == 4 || row == 5 || row == 9) && (col == 2 || col == 6)) ||
-            ((row == 2 || row == 7) && (col == 0 || col == 4 || col == 8)));
+    return (((row == 0 || row == 4 || row == 5 || row == 9) && (col == 2 || col == 6))
+        || ((row == 2 || row == 7) && (col == 0 || col == 4 || col == 8)));
 }
 
-static int getKingMoveTo(int toIndex[], int frow, int fcol)
+static bool isValidPawn(int row, int col, bool isBottom)
 {
-    int count = 0;
-    // 方向   W,   E,    S,    N
-    bool select[] = {true, true, true, true};
-    const Seat tseats[] = {
-        {frow, fcol - 1}, // W
-        {frow, fcol + 1}, // E
-        {frow - 1, fcol}, // S
-        {frow + 1, fcol}  // N
-    };
-
-    if (fcol == 3) // 最左列
-        select[0] = false;
-    else if (fcol == 5) // 最右列
-        select[1] = false;
-    if (frow == 0 || frow == 7)
-        select[2] = false;
-    else if (frow == 2 || frow == 9)
-        select[3] = false;
-
-    for (int i = 0; i < sizeof(tseats) / sizeof(tseats[0]); ++i)
-        if (select[i])
-            toIndex[count++] = getIndexFromSeat(tseats[i]);
-
-    return count;
+    return (isBottom ? (row < 5 || ((row == 5 || row == 6) && (col == 0 || col == 2 || col == 4 || col == 6 || col == 8)))
+                     : (row > 4 || ((row == 3 || row == 4) && (col == 0 || col == 2 || col == 4 || col == 6 || col == 8))));
 }
 
-static int getAdvisorMoveTo(int toIndex[], int frow, int fcol)
+static void initBaseData()
 {
-    int count = 0;
-    // 方向   W,   E,    S,    N
-    bool select[] = {true, true, true, true, true};
-    const Seat tseats[] = {
-        {frow - 1, fcol - 1},
-        {frow - 1, fcol + 1},
-        {frow + 1, fcol - 1},
-        {frow + 1, fcol + 1},
-        {frow < 4 ? 1 : 8, 4}};
-
-    if (fcol == 4)
-        select[4] = false;
-    else
-        select[0] = select[1] = select[2] = select[3] = false;
-
-    for (int i = 0; i < sizeof(tseats) / sizeof(tseats[0]); ++i)
-        if (select[i])
-            toIndex[count++] = getIndexFromSeat(tseats[i]);
-
-    return count;
-}
-
-static int getBishopMoveTo(int toIndex[], int frow, int fcol)
-{
-    int count = 0;
-    bool select[] = {true, true, true, true};
-    const Seat tseats[] = {
-        {frow - 2, fcol - 2}, // SW
-        {frow - 2, fcol + 2}, // SE
-        {frow + 2, fcol - 2}, // NW
-        {frow + 2, fcol + 2}  // NE
-    };
-    if (fcol == 0)
-        select[0] = select[2] = false;
-    else if (fcol == 8)
-        select[1] = select[3] = false;
-    if (frow == 0 || frow == 5)
-        select[0] = select[1] = false;
-    else if (frow == 4 || frow == 9)
-        select[2] = select[3] = false;
-
-    for (int i = 0; i < sizeof(tseats) / sizeof(tseats[0]); ++i)
-        if (select[i])
-            toIndex[count++] = getIndexFromSeat(tseats[i]);
-
-    return count;
-}
-
-static int getKnightMoveTo(int toIndex[], int frow, int fcol)
-{
-    int count = 0;
-    // {SW, SE, NW, NE, WS, ES, WN, EN}
-    bool select[] = {true, true, true, true, true, true, true, true};
-    const Seat tseats[] = {
-        {frow - 2, fcol - 1}, // SW
-        {frow - 2, fcol + 1}, // SE
-        {frow + 2, fcol - 1}, // NW
-        {frow + 2, fcol + 1}, // NE
-        {frow - 1, fcol - 2}, // WS
-        {frow - 1, fcol + 2}, // ES
-        {frow + 1, fcol - 2}, // WN
-        {frow + 1, fcol + 2}  // EN
-    };
-
-    if (fcol == 0) // 最左列
-    {
-        select[0] = select[2] = select[4] = select[6] = false;
-        if (frow == 0) // 最底行
-            select[1] = select[5] = false;
-        else if (frow == 9) // 最顶行
-            select[3] = select[7] = false;
-        else if (frow == 1) // 最底第二行
-            select[1] = false;
-        else if (frow == 8) // 最顶第二行
-            select[3] = false;
-    }
-    else if (fcol == 8) // 最右列
-    {
-        select[1] = select[3] = select[5] = select[7] = false;
-        if (frow == 0)
-            select[0] = select[4] = false;
-        else if (frow == 9)
-            select[2] = select[6] = false;
-        else if (frow == 1)
-            select[0] = false;
-        else if (frow == 8)
-            select[2] = false;
-    }
-    else if (fcol == 1) // 最左第二列
-    {
-        select[4] = select[6] = false;
-        if (frow < 2)
-        {
-            select[0] = select[1] = false;
-            if (frow == 0)
-                select[4] = select[5] = false;
-        }
-        else if (frow > 7)
-        {
-            select[2] = select[3] = false;
-            if (frow == 9)
-                select[6] = select[7] = false;
-        }
-    }
-    else if (fcol == 7) // 最右第二列
-    {
-        select[5] = select[7] = false;
-        if (frow < 2)
-        {
-            select[0] = select[1] = false;
-            if (frow == 0)
-                select[4] = select[5] = false;
-        }
-        else if (frow > 7)
-        {
-            select[2] = select[3] = false;
-            if (frow == 9)
-                select[6] = select[7] = false;
-        }
-    }
-    else
-    {
-        if (frow == 0)
-            select[0] = select[4] = select[1] = select[5] = false;
-        else if (frow == 9)
-            select[3] = select[7] = select[6] = select[2] = false;
-        else if (frow == 1)
-            select[0] = select[1] = false;
-        else if (frow == 8)
-            select[2] = select[3] = false;
-    }
-
-    for (int i = 0; i < sizeof(tseats) / sizeof(tseats[0]); ++i)
-        if (select[i])
-            toIndex[count++] = getIndexFromSeat(tseats[i]);
-
-    return count;
-}
-
-static int getRookCannonMoveTo(int toIndex[], int frow, int fcol)
-{
-    int count = 0;
-    for (int row = frow - 1; row >= 0; --row)
-        toIndex[count++] = getIndexFromSeat((Seat){row, fcol});
-
-    for (int row = frow + 1; row <= 9; ++row)
-        toIndex[count++] = getIndexFromSeat((Seat){row, fcol});
-
-    for (int col = fcol - 1; col >= 0; --col)
-        toIndex[count++] = getIndexFromSeat((Seat){frow, col});
-
-    for (int col = fcol + 1; col <= 8; ++col)
-        toIndex[count++] = getIndexFromSeat((Seat){frow, col});
-
-    return count;
-}
-
-static int getPawnMoveTo(int toIndex[], int frow, int fcol)
-{
-    int count = 0;
-    //           方向   W,   E,    S,    N
-    bool select[] = {true, true, true, true};
-    const Seat tseats[] = {
-        {frow, fcol - 1}, // W
-        {frow, fcol + 1}, // E
-        {frow - 1, fcol}, // S
-        {frow + 1, fcol}  // N
-    };
-    if (frow == 0)
-        select[2] = false;
-    else if (frow == 9)
-        select[3] = false;
-
-    if (fcol == 0)
-        select[0] = false;
-    else if (fcol == 8)
-        select[1] = false;
-
-    for (int i = 0; i < sizeof(tseats) / sizeof(tseats[0]); ++i)
-        if (select[i])
-            toIndex[count++] = getIndexFromSeat(tseats[i]);
-
-    return count;
-}
-
-void initData()
-{
-    IsValid *isValids[] = {
-        isValidKing,
-        isValidAdvisor,
-        isValidBishop,
-        isValid,
-        isValid,
-        isValid,
-        isValid,
-    };
-
-    GetMoveTo *getMoveTos[] = {
-        getKingMoveTo,
-        getAdvisorMoveTo,
-        getBishopMoveTo,
-        getKnightMoveTo,
-        getRookCannonMoveTo,
-        getRookCannonMoveTo,
-        getPawnMoveTo,
-    };
-
     int index = 0;
-    for (int row = 0; row < BOARDROWNUM; ++row)
-    {
-        for (int col = 0; col < BOARDCOLNUM; ++col)
-        {
-            Seats[index] = (Seat){row, col};
+    for (int row = 0; row < BOARDROWNUM; ++row) {
+        for (int col = 0; col < BOARDCOLNUM; ++col) {
+            Seats[index] = (Seat) { row, col };
             BoardMask[index] = BOARDAT(index);
             Rotate[index] = col * BOARDROWNUM + row;
 
@@ -292,34 +78,394 @@ void initData()
         }
     }
 
-    for (Kind kind = KING; kind <= PAWN; ++kind)
-    {
-        int index = 0;
-        for (int row = 0; row < BOARDROWNUM; ++row)
-        {
-            for (int col = 0; col < BOARDCOLNUM; ++col)
-            {
-                if (isValids[kind](row, col))
-                {
-                    // 棋子可放至位置的位棋盘
-                    PiecePut[kind] |= BoardMask[index];
+    char temp[64],
+        boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
+    strcpy(boardStr, "Seats[90]:\n");
+    for (int i = 0; i < BOARDLENGTH; ++i) {
+        snprintf(temp, 64, "seat:(%d, %d), ", Seats[i].row, Seats[i].col);
+        strcat(boardStr, temp);
+        if (i % BOARDCOLNUM == BOARDCOLNUM - 1)
+            strcat(boardStr, "\n");
+    }
 
-                    int toIndex[BOARDCOLNUM + BOARDROWNUM];
-                    int count = getMoveTos[kind](toIndex, row, col);
-                    for (int i = 0; i < count; ++i)
-                        // 棋子在每一位置可移动至位置的位棋盘
-                        PieceMove[kind][index] |= BoardMask[toIndex[i]];
+    strcat(boardStr, "Rotate[90]:\n");
+    for (int i = 0; i < BOARDLENGTH; ++i) {
+        snprintf(temp, 64, "%3d", Rotate[i]);
+        strcat(boardStr, temp);
+        if (i % BOARDROWNUM == BOARDROWNUM - 1)
+            strcat(boardStr, "\n");
+    }
+    printf("%s\n", boardStr);
+
+    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, true, false);
+    printf("testBoardMask:\n%s\n", boardStr);
+}
+
+static void initKingMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index) {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        if (!isValidKing(row, col))
+            continue;
+
+        Board match = 0;
+        if (col > 3)
+            match |= BoardMask[index - 1];
+        if (col < 5)
+            match |= BoardMask[index + 1];
+        if (row == 0 || row == 1 || row == 7 || row == 8)
+            match |= BoardMask[index + BOARDCOLNUM];
+        if (row == 1 || row == 2 || row == 8 || row == 9)
+            match |= BoardMask[index - BOARDCOLNUM];
+
+        KingMove[index] = match;
+    }
+#ifdef DEBUGKING
+    printf("printKingMove:\n");
+
+    char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
+    getBoardStr(boardStr, KingMove, BOARDLENGTH, 9, false, false);
+    printf("%s\n", boardStr);
+#endif
+}
+
+static void initAdvisorMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index) {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        if (!isValidAdvisor(row, col))
+            continue;
+
+        Board match = 0;
+        if (col == 4)
+            match |= (BoardMask[INDEXFROMROWCOL(row - 1, col - 1)]
+                | BoardMask[INDEXFROMROWCOL(row - 1, col + 1)]
+                | BoardMask[INDEXFROMROWCOL(row + 1, col - 1)]
+                | BoardMask[INDEXFROMROWCOL(row + 1, col + 1)]);
+        else
+            match |= BoardMask[INDEXFROMROWCOL(row + (row == 0 || row == 7 ? 1 : -1), 4)];
+
+        AdvisorMove[index] = match;
+    }
+#ifdef DEBUGADVISOR
+    printf("printAdvisorMove:\n");
+
+    char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
+    getBoardStr(boardStr, AdvisorMove, BOARDLENGTH, 5, false, false);
+    printf("%s\n", boardStr);
+#endif
+}
+
+static void initBishopMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index) {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        if (!isValidBishop(row, col))
+            continue;
+
+        for (int state = 0; state < INTBITAT(LEGCOUNT); ++state) {
+            int realState = state;
+            if (row == 0 || row == 5)
+                realState |= (INTBITAT(LEGCOUNT - 1) | INTBITAT(LEGCOUNT - 2));
+            else if (row == 4 || row == BOARDROWNUM - 1)
+                realState |= (INTBITAT(LEGCOUNT - 3) | INTBITAT(LEGCOUNT - 4));
+            if (col == 0)
+                realState |= (INTBITAT(LEGCOUNT - 1) | INTBITAT(LEGCOUNT - 3));
+            else if (col == BOARDCOLNUM - 1)
+                realState |= (INTBITAT(LEGCOUNT - 2) | INTBITAT(LEGCOUNT - 4));
+
+            Board match = 0;
+            if (!(realState & INTBITAT(LEGCOUNT - 1)))
+                match |= BoardMask[index - 2 * BOARDCOLNUM - 2];
+
+            if (!(realState & INTBITAT(LEGCOUNT - 2)))
+                match |= BoardMask[index - 2 * BOARDCOLNUM + 2];
+
+            if (!(realState & INTBITAT(LEGCOUNT - 3)))
+                match |= BoardMask[index + 2 * BOARDCOLNUM - 2];
+
+            if (!(realState & INTBITAT(LEGCOUNT - 4)))
+                match |= BoardMask[index + 2 * BOARDCOLNUM + 2];
+
+            BishopMove[index][state] = match;
+        }
+
+#ifdef DEBUGBISHOP
+        printf("printBishopMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
+
+        char boardStr[INTBITAT(LEGCOUNT) * (BOARDROWNUM + 2) * 16];
+        getBoardStr(boardStr, BishopMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
+        printf("%s\n", boardStr);
+#endif
+    }
+}
+
+static void initKninghtCanMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index) {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        for (int state = 0; state < INTBITAT(LEGCOUNT); ++state) {
+            int realState = state;
+            if (row == 0)
+                realState |= INTBITAT(LEGCOUNT - 1);
+            else if (row == BOARDROWNUM - 1)
+                realState |= INTBITAT(LEGCOUNT - 4);
+            if (col == 0)
+                realState |= INTBITAT(LEGCOUNT - 2);
+            else if (col == BOARDCOLNUM - 1)
+                realState |= INTBITAT(LEGCOUNT - 3);
+
+            Board match = 0;
+            if (!(realState & INTBITAT(LEGCOUNT - 1)) && row > 1) {
+                if (col > 0)
+                    match |= BoardMask[index - 2 * BOARDCOLNUM - 1];
+                if (col < BOARDCOLNUM - 1)
+                    match |= BoardMask[index - 2 * BOARDCOLNUM + 1];
+            }
+            if (!(realState & INTBITAT(LEGCOUNT - 2)) && col > 1) {
+                if (row > 0)
+                    match |= BoardMask[index - 2 - BOARDCOLNUM];
+                if (row < BOARDROWNUM - 1)
+                    match |= BoardMask[index - 2 + BOARDCOLNUM];
+            }
+            if (!(realState & INTBITAT(LEGCOUNT - 3)) && col < BOARDCOLNUM - 2) {
+                if (row > 0)
+                    match |= BoardMask[index + 2 - BOARDCOLNUM];
+                if (row < BOARDROWNUM - 1)
+                    match |= BoardMask[index + 2 + BOARDCOLNUM];
+            }
+            if (!(realState & INTBITAT(LEGCOUNT - 4)) && row < BOARDROWNUM - 2) {
+                if (col > 0)
+                    match |= BoardMask[index + 2 * BOARDCOLNUM - 1];
+                if (col < BOARDCOLNUM - 1)
+                    match |= BoardMask[index + 2 * BOARDCOLNUM + 1];
+            }
+
+            KnightMove[index][state] = match;
+        }
+
+#ifdef DEBUGKNIGHT
+        printf("printKnightMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
+
+        char boardStr[INTBITAT(LEGCOUNT) * (BOARDROWNUM + 2) * 16];
+        getBoardStr(boardStr, KnightMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
+        printf("%s\n", boardStr);
+#endif
+    }
+}
+
+static int getMatch(int state, int rowColIndex, bool isCannon, bool isCol)
+{
+    int match = 0;
+    for (int isHigh = 0; isHigh < 2; ++isHigh) {
+        int direction = isHigh ? 1 : -1,
+            endIndex = isHigh ? (isCol ? BOARDROWNUM : BOARDCOLNUM) - 1 : 0; // 每行列数或每列行数
+        bool skip = false; // 炮是否已跳
+        for (int i = direction * (rowColIndex + direction); i <= endIndex; ++i) {
+            int index = direction * i;
+            bool hasPiece = INTBITHAS(state, index);
+            if (isCannon) {
+                if (!skip) {
+                    if (hasPiece)
+                        skip = true;
+                    else
+                        match |= INTBITAT(index);
+                } else if (hasPiece) {
+                    match |= INTBITAT(index);
+                    break;
                 }
-                else
-                    PieceMove[kind][index] = 0;
+            } else {
+                match |= INTBITAT(index);
+                if (hasPiece) // 遇到棋子
+                    break;
+            }
+        }
+    }
 
-                ++index;
+    return match;
+}
+
+static void initRookCannonCanMove()
+{
+    for (Kind kind = ROOK; kind <= CANNON; ++kind) {
+        bool isCannon = kind == CANNON;
+        for (int isCol = 0; isCol < 2; ++isCol) {
+            int stateTotal = isCol ? COLSTATEMAX : ROWSTATEMAX,
+                length = isCol ? BOARDROWNUM : BOARDCOLNUM;
+            for (int rowCloIndex = 0; rowCloIndex < length; ++rowCloIndex) {
+#ifdef DEBUGROOKCANNON1
+                char temp[32], temp2[32];
+                int count = 0;
+                printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
+                    isCannon ? "Cannon" : "Rook",
+                    isCol ? "Col" : "Row",
+                    getRowColBit(temp, INTBITAT(rowCloIndex), isCol));
+#endif
+
+                Board* moveMatchs = (isCannon
+                        ? (isCol ? CannonColMove[rowCloIndex] : CannonRowMove[rowCloIndex])
+                        : (isCol ? RookColMove[rowCloIndex] : RookRowMove[rowCloIndex]));
+                for (int state = 0; state < stateTotal; ++state) {
+                    // 本状态当前行或列位置无棋子
+                    if (!INTBITHAS(state, rowCloIndex))
+                        continue;
+
+                    int match = getMatch(state, rowCloIndex, isCannon, isCol);
+                    if (match == 0) {
+                        // printf("match==0: %s %s", getRowColBit(temp, state, isCol), getRowColBit(temp2, match, isCol));
+                        continue;
+                    }
+
+                    if (isCol) {
+                        Board colMatch = 0;
+                        for (int row = 0; row < BOARDROWNUM; ++row) {
+                            if (match & INTBITAT(row))
+                                colMatch |= BoardMask[ROWBASEOFFSET(row)]; // 每行的首列置位
+                        }
+                        moveMatchs[state] = colMatch;
+                    } else
+                        moveMatchs[state] = match;
+#ifdef DEBUGROOKCANNON1
+                    printf("%s %s", getRowColBit(temp, state, isCol), getRowColBit(temp2, match, isCol));
+                    if (count % 5 == 4)
+                        printf("\n");
+                    else if (count != (stateTotal >> 1) - 1)
+                        printf(" | ");
+                    count++;
+#endif
+                }
+#ifdef DEBUGROOKCANNON1
+                printf("count: %d\n\n", count);
+#endif
+
+#ifdef DEBUGROOKCANNON2
+                char temp[32];
+                printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
+                    isCannon ? "Cannon" : "Rook",
+                    isCol ? "Col" : "Row",
+                    getRowColBit(temp, INTBITAT(rowCloIndex), isCol));
+
+                char boardStr[stateTotal * (BOARDROWNUM + 2) * 16];
+                getBoardStr(boardStr, moveMatchs, stateTotal, BOARDCOLNUM, false, false);
+                printf("%s\n", boardStr);
+#endif
             }
         }
     }
 }
 
-char *getRowColBit(char *bitStr, int value, bool isCol)
+static void initPawnMove()
+{
+    for (int index = 0; index < BOARDLENGTH; ++index) {
+        Seat fromSeat = Seats[index];
+        int row = fromSeat.row, col = fromSeat.col;
+        for (int isBottom = 0; isBottom < 2; ++isBottom) {
+
+            if (!isValidPawn(row, col, isBottom))
+                continue;
+
+            Board match = 0;
+            if ((isBottom == 0 && row > 4) || (isBottom == 1 && row < 5)) {
+                if (col != 0)
+                    match |= BoardMask[index - 1];
+                if (col != BOARDCOLNUM - 1)
+                    match |= BoardMask[index + 1];
+            }
+            if (isBottom == 0 && row != BOARDROWNUM - 1)
+                match |= BoardMask[index + BOARDCOLNUM];
+            if (isBottom == 1 && row != 0)
+                match |= BoardMask[index - BOARDCOLNUM];
+
+            PawnMove[index][isBottom] = match;
+        }
+
+#ifdef DEBUGPAWN
+        printf("printPawnMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
+
+        char boardStr[2 * (BOARDROWNUM + 2) * 16];
+        getBoardStr(boardStr, PawnMove[index], 2, 2, true, false);
+        printf("%s\n", boardStr);
+#endif
+    }
+}
+
+void initData()
+{
+    initBaseData();
+
+    initKingMove();
+    initAdvisorMove();
+    initBishopMove();
+    initKninghtCanMove();
+    initRookCannonCanMove();
+    initPawnMove();
+}
+
+inline Board getKingMove(int fromIndex)
+{
+    return KingMove[fromIndex];
+}
+
+inline Board getAdvisorMove(int fromIndex)
+{
+    return AdvisorMove[fromIndex];
+}
+
+Board getBishopMove(int fromIndex, Board allPieces)
+{
+    Seat fromSeat = Seats[fromIndex];
+    int row = fromSeat.row, col = fromSeat.col;
+    int state = 0;
+    if (row != 0 && row != 5) {
+        if (col > 0)
+            state |= (allPieces & BoardMask[fromIndex - BOARDCOLNUM - 1]) << (LEGCOUNT - 1);
+        if (col < BOARDCOLNUM - 1)
+            state |= (allPieces & BoardMask[fromIndex - BOARDCOLNUM + 1]) << (LEGCOUNT - 2);
+    }
+    if (row != 4 && row != BOARDROWNUM - 1) {
+        if (col > 0)
+            state |= (allPieces & BoardMask[fromIndex + BOARDCOLNUM - 1]) << (LEGCOUNT - 3);
+        if (col < BOARDCOLNUM - 1)
+            state |= (allPieces & BoardMask[fromIndex + BOARDCOLNUM + 1]) << (LEGCOUNT - 4);
+    }
+
+    return BishopMove[fromIndex][state];
+}
+
+Board getKnightMove(int fromIndex, Board allPieces)
+{
+    Seat fromSeat = Seats[fromIndex];
+    int row = fromSeat.row, col = fromSeat.col;
+    int state = (((row > 0 ? allPieces & BoardMask[fromIndex - BOARDCOLNUM] : 0x1) << (LEGCOUNT - 1))
+        | ((col > 0 ? allPieces & BoardMask[fromIndex - 1] : 0x1) << (LEGCOUNT - 2))
+        | ((col < BOARDCOLNUM - 1 ? allPieces & BoardMask[fromIndex + 1] : 0x1) << (LEGCOUNT - 3))
+        | ((row < BOARDROWNUM - 1 ? allPieces & BoardMask[fromIndex + BOARDCOLNUM] : 0x1) << (LEGCOUNT - 4)));
+
+    return KnightMove[fromIndex][state];
+}
+
+Board getRookCannonMove(bool isCannon, int fromIndex, Board allPieces, Board rotatePieces)
+{
+    Seat fromSeat = Seats[fromIndex];
+    int row = fromSeat.row, col = fromSeat.col,
+        rowOffset = ROWBASEOFFSET(row);
+    Board(*rowCanMove)[ROWSTATEMAX] = isCannon ? CannonRowMove : RookRowMove;
+    Board(*colCanMove)[COLSTATEMAX] = isCannon ? CannonColMove : RookColMove;
+
+    return ((rowCanMove[col][(allPieces >> rowOffset) & 0x1FF] << rowOffset)
+        | (colCanMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
+}
+
+inline Board getPawnMove(int fromIndex, bool isBottom)
+{
+    return PawnMove[fromIndex][isBottom];
+}
+
+char* getRowColBit(char* bitStr, int value, bool isCol)
 {
     if (isCol)
         snprintf(bitStr, 64, BINARYPATTERN10, BYTEBINARY10(value));
@@ -329,7 +475,7 @@ char *getRowColBit(char *bitStr, int value, bool isCol)
     return bitStr;
 }
 
-char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, bool showZero, bool isCol)
+char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol)
 {
     if (length < colNum)
         colNum = length;
@@ -344,22 +490,18 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, b
 
     strcpy(boardStr, "");
     Board nonZeroBoards[length];
-    if (!showZero)
-    {
+    if (!showZero) {
         int count = 0;
-        for (int index = 0; index < length; ++index)
-        {
+        for (int index = 0; index < length; ++index) {
             if (boards[index])
                 nonZeroBoards[count++] = boards[index];
         }
         boards = nonZeroBoards;
         length = count;
     }
-    for (int index = 0; index < length; index += colNum)
-    {
+    for (int index = 0; index < length; index += colNum) {
         strcpy(indexRowStr, "   ");
-        for (int col = 0; col < colNum; ++col)
-        {
+        for (int col = 0; col < colNum; ++col) {
             snprintf(temp, 16, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
         }
@@ -370,15 +512,13 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, b
         int totalRow = isCol ? BOARDCOLNUM : BOARDROWNUM,
             totalCol = !isCol ? BOARDCOLNUM : BOARDROWNUM,
             mode = !isCol ? 0x1FF : 0x3FF;
-        for (int row = 0; row < totalRow; ++row)
-        {
+        for (int row = 0; row < totalRow; ++row) {
             if (isCol)
                 snprintf(temp, 16, "%c: ", 'A' + row);
             else
                 snprintf(temp, 16, "%d: ", row);
             strcat(boardStr, temp);
-            for (int col = 0; col < colNum && index + col < length; ++col)
-            {
+            for (int col = 0; col < colNum && index + col < length; ++col) {
                 int rowOrCol = (boards[index + col] >> (row * totalCol)) & mode;
                 getRowColBit(temp, rowOrCol, isCol);
                 strcat(boardStr, temp);
@@ -391,40 +531,4 @@ char *getBoardStr(char *boardStr, const Board *boards, int length, int colNum, b
     strcat(boardStr, temp);
 
     return boardStr;
-}
-
-void printData()
-{
-    char temp[64],
-        boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
-    strcpy(boardStr, "Seats[90]:\n");
-    for (int i = 0; i < BOARDLENGTH; ++i)
-    {
-        snprintf(temp, 64, "seat:(%d, %d), ", Seats[i].row, Seats[i].col);
-        strcat(boardStr, temp);
-        if (i % BOARDCOLNUM == BOARDCOLNUM - 1)
-            strcat(boardStr, "\n");
-    }
-
-    strcat(boardStr, "Rotate[90]:\n");
-    for (int i = 0; i < BOARDLENGTH; ++i)
-    {
-        snprintf(temp, 64, "%3d", Rotate[i]);
-        strcat(boardStr, temp);
-        if (i % BOARDROWNUM == BOARDROWNUM - 1)
-            strcat(boardStr, "\n");
-    }
-    printf("%s\n", boardStr);
-
-    getBoardStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, true, false);
-    printf("testBoardMask:\n%s\n", boardStr);
-
-    getBoardStr(boardStr, PiecePut, KINDNUM, KINDNUM, true, false);
-    printf("testPiecePut:\n%s\n", boardStr);
-
-    for (int kind = 0; kind < KINDNUM; ++kind)
-    {
-        getBoardStr(boardStr, PieceMove[kind], BOARDLENGTH, BOARDCOLNUM, true, false);
-        printf("testPieceMove kind: %d\n%s\n", kind, boardStr);
-    }
 }

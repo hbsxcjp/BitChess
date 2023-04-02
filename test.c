@@ -1,10 +1,10 @@
 #include "board.h"
 #include "move.h"
 #include <ctype.h>
+#include <locale.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <locale.h>
 
 // 个人令牌
 // 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
@@ -22,7 +22,6 @@ int main()
     // printChessPosition();
 
     // Test move.c
-    initPieceCanMove();
 
     return 0;
 }
