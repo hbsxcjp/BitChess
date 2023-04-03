@@ -3,6 +3,13 @@
 
 #include <stdbool.h>
 
+#define COLORNUM 2
+#define KINDNUM 7
+
+#define BOARDROWNUM 10
+#define BOARDCOLNUM 9
+#define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
+
 #define BOARDBITSIZE 128
 #define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
 #define BOARDAT(i) ((Board)1 << (i))
@@ -11,13 +18,12 @@
 #define INTBITAT(i) (1 << (i))
 #define INTBITHAS(state, index) ((state)&INTBITAT(index))
 
-#define COLORNUM 2
-#define KINDNUM 7
-
-#define BOARDROWNUM 10
-#define BOARDCOLNUM 9
-#define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
-
+#define LEGCOUNT 4
+#define ROWSTATEMAX (1 << BOARDCOLNUM)
+#define COLSTATEMAX (1 << BOARDROWNUM)
+#define ROWBASEOFFSET(row) ((row)*BOARDCOLNUM)
+#define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
+// #define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
 
 typedef __uint128_t Board; // 只使用最低的90位
 
@@ -38,10 +44,10 @@ typedef enum Kind {
     PAWN
 } Kind;
 
-typedef struct ColorKind {
-    Color color;
-    Kind kind;
-} ColorKind;
+// typedef struct Piece {
+//     Color color;
+//     Kind kind;
+// } Piece;
 
 typedef struct Seat {
     int row;
@@ -56,17 +62,39 @@ typedef struct ChessPosition {
     Board pieces[COLORNUM][KINDNUM];
 
     // 计算中间存储数据(基本局面改动时更新)
+    Color bottomColor;
     Board calPieces[ROTATE + 1];
 } ChessPosition;
+
+typedef struct MoveBoard {
+    Color color;
+    Kind kind;
+    int fromIndex;
+
+    Board moveTo;
+} MoveBoard;
 
 extern Seat Seats[BOARDLENGTH];
 extern int Rotate[BOARDLENGTH];
 
 extern Board BoardMask[BOARDLENGTH];
+
 extern Board KingMove[BOARDLENGTH];
 extern Board AdvisorMove[BOARDLENGTH];
 extern Board PawnMove[BOARDLENGTH][2];
 
+// 获取非0位的索引位置
+unsigned int getLowNonZeroIndexFromUInt(unsigned int value);
+
+unsigned int getLowNonZeroIndexFromRowCol(unsigned int value);
+
+int getLowNonZeroIndexs(int indexs[], int value);
+
+int getLowNonZeroIndex(Board board);
+
+int getHighNonZeroIndex(Board board);
+
+// 获取某种棋子在当前状态某个位置可移动的位棋盘
 // Board getKingMove(int fromIndex);return KingMove[fromIndex];
 
 // Board getAdvisorMove(int fromIndex);return AdvisorMove[fromIndex];
@@ -79,10 +107,12 @@ Board getRookCannonMove(bool isCannon, int fromIndex, Board allPieces, Board rot
 
 // Board getPawnMove(int fromIndex, bool isBottom);return PawnMove[fromIndex][isBottom];
 
+// 打印显示位状态
 char* getIntBitStr(char* bitStr, int value, bool isCol);
 
 char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol);
 
+// 初始化预计算的数据
 void initData();
 
 #endif /* DATA_H */

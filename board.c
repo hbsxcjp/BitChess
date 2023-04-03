@@ -84,88 +84,6 @@ static char* getFenFromPieChars(char* fen, const char* pieChars)
     return fen;
 }
 
-// 求最低位非零位的序号，调用前判断参数非零
-static int getLowNonZeroIndex(Board board)
-{
-    int index = BOARDBITSIZE - 1;
-    uint64_t value = board & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
-    if (value)
-        index -= 64;
-    else
-        value = board >> 64; // 64-89 位
-
-    if (value & 0X00000000FFFFFFFFUL) {
-        index -= 32;
-        value &= 0X00000000FFFFFFFFUL;
-    }
-
-    if (value & 0X0000FFFF0000FFFFUL) {
-        index -= 16;
-        value &= 0X0000FFFF0000FFFFUL;
-    }
-
-    if (value & 0X00FF00FF00FF00FFUL) {
-        index -= 8;
-        value &= 0X00FF00FF00FF00FFUL;
-    }
-
-    if (value & 0X0F0F0F0F0F0F0F0FUL) {
-        index -= 4;
-        value &= 0X0F0F0F0F0F0F0F0FUL;
-    }
-
-    if (value & 0X3333333333333333UL) {
-        index -= 2;
-        value &= 0X3333333333333333UL;
-    }
-
-    if (value & 0X5555555555555555UL)
-        index -= 1;
-
-    return index;
-}
-
-// 求最高位非零位的序号，调用前判断参数非全零位
-static int getHighNonZeroIndex(Board board)
-{
-    int index = 0;
-    uint64_t value = board >> 64; // 64-89 位
-    if (value)
-        index += 64;
-    else
-        value = board & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
-
-    if (value & 0XFFFFFFFF00000000UL) {
-        index += 32;
-        value &= 0XFFFFFFFF00000000UL;
-    }
-
-    if (value & 0XFFFF0000FFFF0000UL) {
-        index += 16;
-        value &= 0XFFFF0000FFFF0000UL;
-    }
-
-    if (value & 0XFF00FF00FF00FF00UL) {
-        index += 8;
-        value &= 0XFF00FF00FF00FF00UL;
-    }
-
-    if (value & 0XF0F0F0F0F0F0F0F0UL) {
-        index += 4;
-        value &= 0XF0F0F0F0F0F0F0F0UL;
-    }
-
-    if (value & 0XCCCCCCCCCCCCCCCCUL) {
-        index += 2;
-        value &= 0XCCCCCCCCCCCCCCCCUL;
-    }
-
-    if (value & 0XAAAAAAAAAAAAAAAAUL)
-        index += 1;
-
-    return index;
-}
-
 ChessPosition* updateAllPieces(ChessPosition* chess)
 {
     Board rotatePieces = 0,
@@ -193,6 +111,7 @@ ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen)
             chess->pieces[getColor(ch)][getKind(ch)] |= BoardMask[index];
     }
 
+    chess->bottomColor = getLowNonZeroIndex(chess->pieces[RED][KING]) > (BOARDLENGTH >> 1) ? RED : BLACK;
     // 设置分颜色棋盘
     for (Color color = RED; color <= BLACK; ++color)
         for (Kind kind = KING; kind <= PAWN; ++kind)
@@ -201,29 +120,89 @@ ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen)
     return updateAllPieces(chess);
 }
 
+static void setPieChars(Color color, Kind kind, int index, void* pieChars, void* arg2, const void* arg3)
+{
+    ((char*)pieChars)[index] = Chars[color][kind];
+}
+
+static int traverseChessPieces(const ChessPosition* chess,
+    void func(Color color, Kind kind, int index, void* arg1, void* arg2, const void* arg3),
+    void* arg1, void* arg2, const void* arg3)
+{
+    int count = 0;
+    for (Color color = RED; color <= BLACK; ++color) {
+        int (*getNonZeroIndex)(Board) = color == chess->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
+        for (Kind kind = KING; kind <= PAWN; ++kind) {
+            Board board = chess->pieces[color][kind];
+            while (board) {
+                int index = getNonZeroIndex(board);
+                // 执行针对遍历元素的操作函数
+                func(color, kind, index, arg1, arg2, arg3);
+                ++count;
+                board ^= BoardMask[index];
+            }
+        }
+    }
+
+    return count;
+}
+
 char* getFenFromChessPosition(char* fen, const ChessPosition* chess)
 {
     char pieChars[BOARDLENGTH + 1];
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
 
-    for (Color color = RED; color <= BLACK; ++color) {
-        int (*getNonZeroIndex)(Board) = color == BLACK ? getHighNonZeroIndex : getLowNonZeroIndex;
-        for (Kind kind = KING; kind <= PAWN; ++kind) {
-            char ch = Chars[color][kind];
-            Board board = chess->pieces[color][kind];
-            while (board) {
-                int index = getNonZeroIndex(board);
-                pieChars[index] = ch;
-                board ^= BoardMask[index];
-            }
-        }
-    }
-
+    traverseChessPieces(chess, setPieChars, pieChars, NULL, NULL);
     pieChars[BOARDLENGTH] = EndChar;
     return getFenFromPieChars(fen, pieChars);
 }
 
+static void getMoveBoards(Color color, Kind kind, int index, void* moveBoard, void* count, const void* chess)
+{
+    Board board = 0;
+    switch (kind) {
+    case KING:
+        board = KingMove[index];
+        break;
+    case ADVISOR:
+        board = AdvisorMove[index];
+        break;
+    case BISHOP:
+        // board = getBishopMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
+        break;
+    case KNIGHT:
+        // board = getKnightMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
+        break;
+    case ROOK: {
+        const Board* calPieces = ((const ChessPosition*)chess)->calPieces;
+        board = getRookCannonMove(false, index, calPieces[ALLCOLOR], calPieces[ROTATE]);
+    } break;
+    case CANNON: {
+        const Board* calPieces = ((const ChessPosition*)chess)->calPieces;
+        board = getRookCannonMove(true, index, calPieces[ALLCOLOR], calPieces[ROTATE]);
+    } break;
+    default:
+        board = PawnMove[index][((const ChessPosition*)chess)->bottomColor == color];
+        break;
+    }
+
+    ((MoveBoard*)moveBoard)[(*(int*)count)++] = (MoveBoard) { color, kind, index, board };
+}
+
+int getChessPositionMoveBoard(MoveBoard moveBoard[], const ChessPosition* chess)
+{
+    int count = 0;
+    traverseChessPieces(chess, getMoveBoards, moveBoard, &count, chess);
+
+    return count;
+}
+
+static void setBoardNames(Color color, Kind kind, int index, void* boardStr, void* arg2, const void* arg3)
+{
+    Seat seat = Seats[index];
+    ((char*)boardStr)[seat.row * (BOARDCOLNUM + 1) + seat.col] = Chars[color][kind];
+}
 
 static char* getChessPositionStr(char* chessStr, const ChessPosition* chess)
 {
@@ -261,20 +240,7 @@ static char* getChessPositionStr(char* chessStr, const ChessPosition* chess)
 
     strcat(chessStr, "chessBoardStr:\n");
     strcpy(temp, BoardStr);
-    for (Color color = RED; color <= BLACK; ++color) {
-        int (*getNonZeroIndex)(Board) = color == BLACK ? getHighNonZeroIndex : getLowNonZeroIndex;
-        for (Kind kind = KING; kind <= PAWN; ++kind) {
-            char ch = Chars[color][kind];
-            Board board = chess->pieces[color][kind];
-            while (board) {
-                int index = getNonZeroIndex(board);
-                Seat seat = Seats[index];
-                temp[seat.row * (BOARDCOLNUM + 1) + seat.col] = ch;
-
-                board ^= BoardMask[index];
-            }
-        }
-    }
+    traverseChessPieces(chess, setBoardNames, temp, NULL, NULL);
     strcat(chessStr, temp);
 
     return chessStr;
@@ -308,5 +274,8 @@ void testChessPosition()
 
         printf("testChessPosition:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n\n",
             chessStr, afen, setFen, strcmp(setFen, afen));
+
+        MoveBoard moveBoard[(BOARDROWNUM + BOARDCOLNUM) * 32];
+        int count = getChessPositionMoveBoard(moveBoard, &chess);
     }
 }

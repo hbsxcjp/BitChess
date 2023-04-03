@@ -13,13 +13,6 @@
 // #define DEBUGROOKCANNON2
 // #define DEBUGPAWN
 
-#define LEGCOUNT 4
-#define ROWSTATEMAX (1 << BOARDCOLNUM)
-#define COLSTATEMAX (1 << BOARDROWNUM)
-#define ROWBASEOFFSET(row) ((row)*BOARDCOLNUM)
-#define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
-#define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
-
 Seat Seats[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
 Board BoardMask[BOARDLENGTH];
@@ -40,6 +33,163 @@ static Board CannonColMove[BOARDROWNUM][COLSTATEMAX];
 
 // 兵根据本方处于上或下的二个位置状态选取可移动位棋盘
 Board PawnMove[BOARDLENGTH][2];
+
+// 通过二分搜索计算右侧的连续零位（尾随）
+unsigned int getLowNonZeroIndexFromUInt(unsigned int value)
+{
+    // unsigned int v; // 32-bit word input to count zero bits on right
+    unsigned int index; // c will be the number of zero bits on the right,
+    //                 // so if v is 1101000 (base 2), then c will be 3
+    // // NOTE: if 0 == v, then c = 31.
+    if (value & 0x1) {
+        // special case for odd v (assumed to happen half of the time)
+        index = 0;
+    } else {
+        index = 1;
+        if ((value & 0xffff) == 0) {
+            value >>= 16;
+            index += 16;
+        }
+        if ((value & 0xff) == 0) {
+            value >>= 8;
+            index += 8;
+        }
+        if ((value & 0xf) == 0) {
+            value >>= 4;
+            index += 4;
+        }
+        if ((value & 0x3) == 0) {
+            value >>= 2;
+            index += 2;
+        }
+        index -= value & 0x1;
+    }
+
+    return index;
+}
+// 上面的代码类似于前面的方法，但它计算数字 通过以类似于二叉搜索的方式累加 c 来尾随零。 第一步，它检查 v 的底部 16 位是否为零， 如果是这样，则将 v 右移 16 位并将 16 位加到 c，从而减少 V 中要考虑的位数减半。每个后续 条件步骤同样将位数减半，直到只有 1。 这种方法比上一种方法快（大约33 %），因为身体 的 if 语句执行频率较低。
+//         马特·惠特洛克（Matt Whitlock）在25年2006月5日提出了这个建议。安德鲁·夏皮拉剃光 2007 年 1 月<>
+//             日关闭了几次操作（通过设置 c = <>
+//     和无条件 最后减去）。
+
+// 求最低位非零位的序号，调用前判断参数非零
+unsigned int getLowNonZeroIndexFromRowCol(unsigned int value)
+{
+    int index = 16 - 1;
+    if (value & 0X00FF) {
+        index -= 8;
+        value &= 0X00FF;
+    }
+
+    if (value & 0X0F0F) {
+        index -= 4;
+        value &= 0X0F0F;
+    }
+
+    if (value & 0X3333) {
+        index -= 2;
+        value &= 0X3333;
+    }
+
+    if (value & 0X5555)
+        index -= 1;
+
+    return index;
+}
+
+int getLowNonZeroIndexs(int indexs[], int value)
+{
+    int count = 0;
+    while (value) {
+        int index = getLowNonZeroIndexFromUInt(value);
+        indexs[count++] = index;
+        value ^= INTBITAT(index);
+    }
+
+    return count;
+}
+
+// 求最低位非零位的序号，调用前判断参数非零
+int getLowNonZeroIndex(Board board)
+{
+    int index = BOARDBITSIZE - 1;
+    uint64_t value = board & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
+    if (value)
+        index -= 64;
+    else
+        value = board >> 64; // 64-89 位
+
+    if (value & 0X00000000FFFFFFFFUL) {
+        index -= 32;
+        value &= 0X00000000FFFFFFFFUL;
+    }
+
+    if (value & 0X0000FFFF0000FFFFUL) {
+        index -= 16;
+        value &= 0X0000FFFF0000FFFFUL;
+    }
+
+    if (value & 0X00FF00FF00FF00FFUL) {
+        index -= 8;
+        value &= 0X00FF00FF00FF00FFUL;
+    }
+
+    if (value & 0X0F0F0F0F0F0F0F0FUL) {
+        index -= 4;
+        value &= 0X0F0F0F0F0F0F0F0FUL;
+    }
+
+    if (value & 0X3333333333333333UL) {
+        index -= 2;
+        value &= 0X3333333333333333UL;
+    }
+
+    if (value & 0X5555555555555555UL)
+        index -= 1;
+
+    return index;
+}
+
+// 求最高位非零位的序号，调用前判断参数非全零位
+int getHighNonZeroIndex(Board board)
+{
+    int index = 0;
+    uint64_t value = board >> 64; // 64-89 位
+    if (value)
+        index += 64;
+    else
+        value = board & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
+
+    if (value & 0XFFFFFFFF00000000UL) {
+        index += 32;
+        value &= 0XFFFFFFFF00000000UL;
+    }
+
+    if (value & 0XFFFF0000FFFF0000UL) {
+        index += 16;
+        value &= 0XFFFF0000FFFF0000UL;
+    }
+
+    if (value & 0XFF00FF00FF00FF00UL) {
+        index += 8;
+        value &= 0XFF00FF00FF00FF00UL;
+    }
+
+    if (value & 0XF0F0F0F0F0F0F0F0UL) {
+        index += 4;
+        value &= 0XF0F0F0F0F0F0F0F0UL;
+    }
+
+    if (value & 0XCCCCCCCCCCCCCCCCUL) {
+        index += 2;
+        value &= 0XCCCCCCCCCCCCCCCCUL;
+    }
+
+    if (value & 0XAAAAAAAAAAAAAAAAUL)
+        index += 1;
+
+    return index;
+}
 
 static bool isValidKing(int row, int col)
 {
@@ -141,12 +291,12 @@ static void initAdvisorMove()
 
         Board match;
         if (col == 4)
-            match = (BoardMask[INDEXFROMROWCOL(row - 1, col - 1)]
-                | BoardMask[INDEXFROMROWCOL(row - 1, col + 1)]
-                | BoardMask[INDEXFROMROWCOL(row + 1, col - 1)]
-                | BoardMask[INDEXFROMROWCOL(row + 1, col + 1)]);
+            match = (BoardMask[index - BOARDCOLNUM - 1]
+                | BoardMask[index - BOARDCOLNUM + 1]
+                | BoardMask[index + BOARDCOLNUM - 1]
+                | BoardMask[index + BOARDCOLNUM + 1]);
         else
-            match = BoardMask[INDEXFROMROWCOL(row + (row == 0 || row == 7 ? 1 : -1), 4)];
+            match = BoardMask[row < 3 ? 13 : 76];
 
         AdvisorMove[index] = match;
     }
@@ -393,6 +543,7 @@ static void initPawnMove()
 #endif
     }
 }
+
 Board getBishopMove(int fromIndex, Board allPieces)
 {
     Seat fromSeat = Seats[fromIndex];
