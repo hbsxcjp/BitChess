@@ -9,7 +9,7 @@ ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen);
 
 char* getFenFromChessPosition(char* fen, const ChessPosition* chess);
 
-int getChessPositionMoveBoard(MoveBoard moveBoard[], const ChessPosition* chess);
+int getChessPositionMoveBoards(MoveBoard moveBoards[], const ChessPosition* chess, Color color);
 
 void testChessPosition();
 

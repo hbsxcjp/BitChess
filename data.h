@@ -9,6 +9,7 @@
 #define BOARDROWNUM 10
 #define BOARDCOLNUM 9
 #define BOARDLENGTH (BOARDROWNUM * BOARDCOLNUM)
+#define MOVEBOARDMAXCOUNT 256
 
 #define BOARDBITSIZE 128
 #define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
@@ -24,6 +25,23 @@
 #define ROWBASEOFFSET(row) ((row)*BOARDCOLNUM)
 #define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
 // #define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
+
+#define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
+#define BINARYPATTERN10 ("%c" BINARYPATTERN9)
+
+#define BYTEBINARY9(i)            \
+    (((i)&0x01) ? '1' : '-'),     \
+        (((i)&0x02) ? '1' : '-'), \
+        (((i)&0x04) ? '1' : '-'), \
+        (((i)&0x08) ? '1' : '-'), \
+        (((i)&0x10) ? '1' : '-'), \
+        (((i)&0x20) ? '1' : '-'), \
+        (((i)&0x40) ? '1' : '-'), \
+        (((i)&0x80) ? '1' : '-'), \
+        (((i)&0x100) ? '1' : '-')
+#define BYTEBINARY10(i) \
+    BYTEBINARY9(i),     \
+        (((i)&0x200) ? '1' : '-')
 
 typedef __uint128_t Board; // 只使用最低的90位
 
@@ -103,14 +121,20 @@ Board getBishopMove(int fromIndex, Board allPieces);
 
 Board getKnightMove(int fromIndex, Board allPieces);
 
-Board getRookCannonMove(bool isCannon, int fromIndex, Board allPieces, Board rotatePieces);
+Board getRookMove(int fromIndex, Board allPieces, Board rotatePieces);
+
+Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces);
 
 // Board getPawnMove(int fromIndex, bool isBottom);return PawnMove[fromIndex][isBottom];
 
 // 打印显示位状态
-char* getIntBitStr(char* bitStr, int value, bool isCol);
+char* getBitStr(char* bitStr, int value, bool isCol);
 
-char* getBoardStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol);
+char* getBoardStr(char* boardStr, Board board);
+
+char* getBoardArrayStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol);
+
+char* getMoveBoardsStr(char* moveStr, const MoveBoard* moveBoards, int count);
 
 // 初始化预计算的数据
 void initData();

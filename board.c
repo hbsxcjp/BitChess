@@ -107,8 +107,9 @@ ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen)
 
     for (int index = 0; index < BOARDLENGTH; ++index) {
         char ch;
-        if ((ch = pieChars[index]) != NullChar)
+        if ((ch = pieChars[index]) != NullChar) {
             chess->pieces[getColor(ch)][getKind(ch)] |= BoardMask[index];
+        }
     }
 
     chess->bottomColor = getLowNonZeroIndex(chess->pieces[RED][KING]) > (BOARDLENGTH >> 1) ? RED : BLACK;
@@ -120,31 +121,26 @@ ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen)
     return updateAllPieces(chess);
 }
 
-static void setPieChars(Color color, Kind kind, int index, void* pieChars, void* arg2, const void* arg3)
+static void traverseChessPieces(const ChessPosition* chess, Color color,
+    void func(const ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
 {
-    ((char*)pieChars)[index] = Chars[color][kind];
-}
+    int (*getNonZeroIndex)(Board) = color == chess->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
+    for (Kind kind = KING; kind <= PAWN; ++kind) {
+        Board board = chess->pieces[color][kind];
+        while (board) {
+            int index = getNonZeroIndex(board);
+            // 执行针对遍历元素的操作函数
+            func(chess, color, kind, index, arg1, arg2);
 
-static int traverseChessPieces(const ChessPosition* chess,
-    void func(Color color, Kind kind, int index, void* arg1, void* arg2, const void* arg3),
-    void* arg1, void* arg2, const void* arg3)
-{
-    int count = 0;
-    for (Color color = RED; color <= BLACK; ++color) {
-        int (*getNonZeroIndex)(Board) = color == chess->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
-        for (Kind kind = KING; kind <= PAWN; ++kind) {
-            Board board = chess->pieces[color][kind];
-            while (board) {
-                int index = getNonZeroIndex(board);
-                // 执行针对遍历元素的操作函数
-                func(color, kind, index, arg1, arg2, arg3);
-                ++count;
-                board ^= BoardMask[index];
-            }
+            board ^= BoardMask[index];
         }
     }
+}
 
-    return count;
+static void setPieChars(const ChessPosition* chess, Color color, Kind kind, int index, void* pieChars, void* arg2)
+{
+    ((char*)pieChars)[index] = Chars[color][kind];
 }
 
 char* getFenFromChessPosition(char* fen, const ChessPosition* chess)
@@ -153,14 +149,17 @@ char* getFenFromChessPosition(char* fen, const ChessPosition* chess)
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
 
-    traverseChessPieces(chess, setPieChars, pieChars, NULL, NULL);
+    Color colors[COLORNUM] = { RED, BLACK };
+    for (int i = 0; i < COLORNUM; ++i)
+        traverseChessPieces(chess, colors[i], setPieChars, pieChars, NULL);
+
     pieChars[BOARDLENGTH] = EndChar;
     return getFenFromPieChars(fen, pieChars);
 }
 
-static void getMoveBoards(Color color, Kind kind, int index, void* moveBoard, void* count, const void* chess)
+static Board getMoveTo(const ChessPosition* chess, Color color, Kind kind, int index)
 {
-    Board board = 0;
+    Board board;
     switch (kind) {
     case KING:
         board = KingMove[index];
@@ -169,36 +168,40 @@ static void getMoveBoards(Color color, Kind kind, int index, void* moveBoard, vo
         board = AdvisorMove[index];
         break;
     case BISHOP:
-        board = getBishopMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
+        board = getBishopMove(index, chess->calPieces[ALLCOLOR]);
         break;
     case KNIGHT:
-        board = getKnightMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
+        board = getKnightMove(index, chess->calPieces[ALLCOLOR]);
         break;
-    case ROOK: {
-        const Board* calPieces = ((const ChessPosition*)chess)->calPieces;
-        board = getRookCannonMove(false, index, calPieces[ALLCOLOR], calPieces[ROTATE]);
-    } break;
-    case CANNON: {
-        const Board* calPieces = ((const ChessPosition*)chess)->calPieces;
-        board = getRookCannonMove(true, index, calPieces[ALLCOLOR], calPieces[ROTATE]);
-    } break;
+    case ROOK:
+        board = getRookMove(index, chess->calPieces[ALLCOLOR], chess->calPieces[ROTATE]);
+        break;
+    case CANNON:
+        board = getCannonMove(index, chess->calPieces[ALLCOLOR], chess->calPieces[ROTATE]);
+        break;
     default:
-        board = PawnMove[index][((const ChessPosition*)chess)->bottomColor == color];
+        board = PawnMove[index][chess->bottomColor == color];
         break;
     }
 
-    ((MoveBoard*)moveBoard)[(*(int*)count)++] = (MoveBoard) { color, kind, index, board };
+    // 去掉同色棋子
+    return board ^ (board & chess->calPieces[color]);
 }
 
-int getChessPositionMoveBoard(MoveBoard moveBoard[], const ChessPosition* chess)
+static void getMoveBoards(const ChessPosition* chess, Color color, Kind kind, int index, void* moveBoards, void* count)
+{
+    ((MoveBoard*)moveBoards)[(*(int*)count)++] = (MoveBoard) { color, kind, index, getMoveTo(chess, color, kind, index) };
+}
+
+int getChessPositionMoveBoards(MoveBoard moveBoards[], const ChessPosition* chess, Color color)
 {
     int count = 0;
-    traverseChessPieces(chess, getMoveBoards, moveBoard, &count, chess);
+    traverseChessPieces(chess, color, getMoveBoards, moveBoards, &count);
 
     return count;
 }
 
-static void setBoardNames(Color color, Kind kind, int index, void* boardStr, void* arg2, const void* arg3)
+static void setBoardNames(const ChessPosition* chess, Color color, Kind kind, int index, void* boardStr, void* arg2)
 {
     Seat seat = Seats[index];
     ((char*)boardStr)[seat.row * (BOARDCOLNUM + 1) + seat.col] = Chars[color][kind];
@@ -225,22 +228,24 @@ static char* getChessPositionStr(char* chessStr, const ChessPosition* chess)
         snprintf(temp, 32, "chess->pieces[%s][Kind]:\n", colorStrs[!color]);
         strcat(chessStr, temp);
 
-        getBoardStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, true, false);
+        getBoardArrayStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, true, false);
         strcat(chessStr, temp);
     }
 
     snprintf(temp, 128, "calPieces[Color]: \nRED:         BLACK:    ALLCOLOR:\n");
     strcat(chessStr, temp);
-    getBoardStr(temp, chess->calPieces, ALLCOLOR + 1, KINDNUM, true, false);
+    getBoardArrayStr(temp, chess->calPieces, ALLCOLOR + 1, KINDNUM, true, false);
     strcat(chessStr, temp);
 
     strcat(chessStr, "ROTATE: \n");
-    getBoardStr(temp, &chess->calPieces[ROTATE], 1, KINDNUM, true, true);
+    getBoardArrayStr(temp, &chess->calPieces[ROTATE], 1, KINDNUM, true, true);
     strcat(chessStr, temp);
 
     strcat(chessStr, "chessBoardStr:\n");
     strcpy(temp, BoardStr);
-    traverseChessPieces(chess, setBoardNames, temp, NULL, NULL);
+    Color colors[COLORNUM] = { RED, BLACK };
+    for (int i = 0; i < COLORNUM; ++i)
+        traverseChessPieces(chess, colors[i], setBoardNames, temp, NULL);
     strcat(chessStr, temp);
 
     return chessStr;
@@ -272,10 +277,15 @@ void testChessPosition()
         getChessPositionStr(chessStr, &chess);
         getFenFromChessPosition(setFen, &chess);
 
-        printf("testChessPosition:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n\n",
+        printf("testChessPosition:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n",
             chessStr, afen, setFen, strcmp(setFen, afen));
 
-        MoveBoard moveBoard[(BOARDROWNUM + BOARDCOLNUM) * 32];
-        int count = getChessPositionMoveBoard(moveBoard, &chess);
+        printf("testChessPositionMoveBoard:\n");
+        MoveBoard moveBoards[MOVEBOARDMAXCOUNT];
+        Color colors[COLORNUM] = { RED, BLACK };
+        for (int i = 0; i < COLORNUM; ++i) {
+            int count = getChessPositionMoveBoards(moveBoards, &chess, colors[i]);
+            printf("color:%2d\n%smoveCount:%2d\n", colors[i], getMoveBoardsStr(chessStr, moveBoards, count), count);
+        }
     }
 }
