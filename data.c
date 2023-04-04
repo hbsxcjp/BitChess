@@ -552,10 +552,10 @@ Board getBishopMove(int fromIndex, Board allPieces)
          isNonBottom = row != 4 && row != BOARDROWNUM - 1,
          isNonLeft = col > 0,
          isNonRight = col < BOARDCOLNUM - 1;
-    int state = (((isNonTop && isNonLeft ? allPieces & BoardMask[fromIndex - BOARDCOLNUM - 1] : 0x1) << (LEGCOUNT - 1))
-        | ((isNonTop && isNonRight ? allPieces & BoardMask[fromIndex - BOARDCOLNUM + 1] : 0x1) << (LEGCOUNT - 2))
-        | ((isNonBottom && isNonLeft ? allPieces & BoardMask[fromIndex + BOARDCOLNUM - 1] : 0x1) << (LEGCOUNT - 3))
-        | ((isNonBottom && isNonRight ? allPieces & BoardMask[fromIndex + BOARDCOLNUM + 1] : 0x1) << (LEGCOUNT - 4)));
+    int state = ((isNonTop && isNonLeft && !(allPieces & BoardMask[fromIndex - BOARDCOLNUM - 1]) ? 0 : INTBITAT(LEGCOUNT - 1))
+        | (isNonTop && isNonRight && !(allPieces & BoardMask[fromIndex - BOARDCOLNUM + 1]) ? 0 : INTBITAT(LEGCOUNT - 2))
+        | (isNonBottom && isNonLeft && !(allPieces & BoardMask[fromIndex + BOARDCOLNUM - 1]) ? 0 : INTBITAT(LEGCOUNT - 3))
+        | (isNonBottom && isNonRight && !(allPieces & BoardMask[fromIndex + BOARDCOLNUM + 1]) ? 0 : INTBITAT(LEGCOUNT - 4)));
 
     return BishopMove[fromIndex][state];
 }
@@ -564,10 +564,10 @@ Board getKnightMove(int fromIndex, Board allPieces)
 {
     Seat fromSeat = Seats[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
-    int state = (((row > 0 ? allPieces & BoardMask[fromIndex - BOARDCOLNUM] : 0x1) << (LEGCOUNT - 1))
-        | ((col > 0 ? allPieces & BoardMask[fromIndex - 1] : 0x1) << (LEGCOUNT - 2))
-        | ((col < BOARDCOLNUM - 1 ? allPieces & BoardMask[fromIndex + 1] : 0x1) << (LEGCOUNT - 3))
-        | ((row < BOARDROWNUM - 1 ? allPieces & BoardMask[fromIndex + BOARDCOLNUM] : 0x1) << (LEGCOUNT - 4)));
+    int state = ((row > 0 && !(allPieces & BoardMask[fromIndex - BOARDCOLNUM]) ? 0 : INTBITAT(LEGCOUNT - 1))
+        | (col > 0 && !(allPieces & BoardMask[fromIndex - 1]) ? 0 : INTBITAT(LEGCOUNT - 2))
+        | (col < BOARDCOLNUM - 1 && !(allPieces & BoardMask[fromIndex + 1]) ? 0 : INTBITAT(LEGCOUNT - 3))
+        | (row < BOARDROWNUM - 1 && !(allPieces & BoardMask[fromIndex + BOARDCOLNUM]) ? 0 : INTBITAT(LEGCOUNT - 4)));
 
     return KnightMove[fromIndex][state];
 }

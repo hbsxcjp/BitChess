@@ -169,10 +169,10 @@ static void getMoveBoards(Color color, Kind kind, int index, void* moveBoard, vo
         board = AdvisorMove[index];
         break;
     case BISHOP:
-        // board = getBishopMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
+        board = getBishopMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
         break;
     case KNIGHT:
-        // board = getKnightMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
+        board = getKnightMove(index, ((const ChessPosition*)chess)->calPieces[ALLCOLOR]);
         break;
     case ROOK: {
         const Board* calPieces = ((const ChessPosition*)chess)->calPieces;
