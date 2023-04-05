@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define DEBUGGETMOVETO
+// #define DEBUGFILTERKILLEDMOVE
 
 Kind doMove(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex)
 {
@@ -87,36 +87,36 @@ static Board getColorMove(ChessPosition* chess, Color color)
     return colorMove;
 }
 
+static void filterKilledMove(ChessPosition* chess, Color color, Kind kind, int toIndex, void* pfromIndex, void* pmoveTo)
+{
+#ifdef DEBUGFILTERKILLEDMOVE
+    ChessPosition tempChess = *chess;
+#endif
+    int fromIndex = *(int*)pfromIndex;
+    Kind eatKind = doMove(chess, color, kind, fromIndex, toIndex);
+    // 排除被杀将的位置
+    if (getColorMove(chess, !color) & chess->pieces[color][KING])
+        *(Board*)pmoveTo ^= BoardMask[toIndex];
+
+    undoMove(chess, color, kind, toIndex, fromIndex, eatKind);
+
+#ifdef DEBUGFILTERKILLEDMOVE
+    char chessStr[4 * 4096];
+    if (!isEqual(tempChess, *chess)) {
+        printf("testGetMoveTo:\ntempChess:\n%s", getChessPositionStr(chessStr, &tempChess));
+        printf("*chess:\n%s\n", getChessPositionStr(chessStr, chess));
+    }
+    assert(isEqual(tempChess, *chess));
+#endif
+}
+
 static Move getMoveTo(ChessPosition* chess, Color color, Kind kind, int fromIndex)
 {
     Board moveTo = getMove(chess, color, kind, fromIndex),
           tempMove = moveTo;
 
-    GetIndexFunc getIndexFunc = getNonZeroIndex(chess, color);
-    while (tempMove) {
-        int toIndex = getIndexFunc(tempMove);
-
-#ifdef DEBUGGETMOVETO
-        ChessPosition tempChess = *chess;
-#endif
-        Kind eatKind = doMove(chess, color, kind, fromIndex, toIndex);
-        // 排除被杀将的位置
-        if (getColorMove(chess, !color) & chess->pieces[color][KING])
-            moveTo ^= BoardMask[toIndex];
-
-        undoMove(chess, color, kind, toIndex, fromIndex, eatKind);
-
-#ifdef DEBUGGETMOVETO
-        char chessStr[4 * 4096];
-        if (!isEqual(tempChess, *chess)) {
-            printf("testGetMoveTo:\ntempChess:\n%s", getChessPositionStr(chessStr, &tempChess));
-            printf("*chess:\n%s\n", getChessPositionStr(chessStr, chess));
-        }
-        assert(isEqual(tempChess, *chess));
-#endif
-
-        tempMove ^= BoardMask[toIndex];
-    }
+    traverseColorKindPieces(chess, color, kind, getNonZeroIndex(chess, color), tempMove,
+        filterKilledMove, &fromIndex, &moveTo);
 
     return (Move) { color, kind, fromIndex, moveTo };
 }

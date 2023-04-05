@@ -162,7 +162,7 @@ void testChessPosition()
         Color colors[COLORNUM] = { RED, BLACK };
         for (int i = 0; i < COLORNUM; ++i) {
             int count = getChessPositionMoveTos(moves, &chess, colors[i]);
-            printf("color:%2d\n%smoveCount:%2d\n", colors[i], getMoveArrayStr(chessStr, moves, count, KINDNUM + 1), count);
+            printf("%smoveCount:%2d\n", getMoveArrayStr(chessStr, moves, count, KINDNUM + 1), count);
         }
     }
 }

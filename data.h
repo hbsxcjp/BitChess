@@ -134,6 +134,10 @@ Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces);
 // 清除原位置，置位新位置
 void turnColorKindPieces(ChessPosition* chess, Color color, Kind kind, Board turnBoard, Board rotateTurnBoard);
 
+void traverseColorKindPieces(ChessPosition* chess, Color color, Kind kind, GetIndexFunc getIndexFunc, Board board,
+    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2);
+    
 void traverseColorPieces(ChessPosition* chess, Color color,
     void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
     void* arg1, void* arg2);

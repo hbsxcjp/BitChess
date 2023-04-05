@@ -608,20 +608,27 @@ void turnColorKindPieces(ChessPosition* chess, Color color, Kind kind, Board tur
     chess->calPieces[ROTATE] ^= rotateTurnBoard;
 }
 
+void traverseColorKindPieces(ChessPosition* chess, Color color, Kind kind, GetIndexFunc getIndexFunc, Board board,
+    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
+{
+    while (board) {
+        int index = getIndexFunc(board);
+        // 执行针对遍历元素的操作函数
+        func(chess, color, kind, index, arg1, arg2);
+
+        board ^= BoardMask[index];
+    }
+}
+
 void traverseColorPieces(ChessPosition* chess, Color color,
     void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
     void* arg1, void* arg2)
 {
     GetIndexFunc getIndexFunc = getNonZeroIndex(chess, color);
     for (Kind kind = KING; kind <= PAWN; ++kind) {
-        Board board = chess->pieces[color][kind];
-        while (board) {
-            int index = getIndexFunc(board);
-            // 执行针对遍历元素的操作函数
-            func(chess, color, kind, index, arg1, arg2);
-
-            board ^= BoardMask[index];
-        }
+        traverseColorKindPieces(chess, color, kind, getIndexFunc, chess->pieces[color][kind],
+            func, arg1, arg2);
     }
 }
 
@@ -736,7 +743,7 @@ char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int col
         strcat(moveArrayStr, "   ");
         for (int col = 0; col < colNum && index + col < length; ++col) {
             Move move = moves[index + col];
-            snprintf(temp, 64, "K:%d f:%2d  ", move.kind, move.index);
+            snprintf(temp, 64, "%c %02d      ", Chars[move.color][move.kind], move.index);
             strcat(moveArrayStr, temp);
 
             getBoardStr(boardStr[col], move.moveTo, false);
