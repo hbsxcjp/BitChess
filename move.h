@@ -3,6 +3,10 @@
 
 #include "data.h"
 
-ChessPosition* doMoveChessPosition(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex);
+Kind doMove(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex);
+
+void undoMove(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex, Kind eatKind);
+
+int getChessPositionMoveTos(Move moves[], ChessPosition* chess, Color color);
 
 #endif /* MOVE_H */

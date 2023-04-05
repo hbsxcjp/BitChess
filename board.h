@@ -3,13 +3,9 @@
 
 #include "data.h"
 
-ChessPosition* updateAllPieces(ChessPosition* chess);
-
 ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen);
 
-char* getFenFromChessPosition(char* fen, const ChessPosition* chess);
-
-int getChessPositionMoveBoards(MoveBoard moveBoards[], const ChessPosition* chess, Color color);
+char* getFenFromChessPosition(char* fen, ChessPosition* chess);
 
 void testChessPosition();
 

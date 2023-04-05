@@ -13,6 +13,8 @@
 // #define DEBUGROOKCANNON2
 // #define DEBUGPAWN
 
+const char Chars[COLORNUM][KINDNUM] = { "KABNRCP", "kabnrcp" };
+
 Seat Seats[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
 Board BoardMask[BOARDLENGTH];
@@ -189,6 +191,11 @@ int getHighNonZeroIndex(Board board)
         index += 1;
 
     return index;
+}
+
+GetIndexFunc getNonZeroIndex(ChessPosition* chess, Color color)
+{
+    return color == chess->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
 }
 
 static bool isValidKing(int row, int col)
@@ -409,12 +416,12 @@ static void initKninghtCanMove()
     }
 }
 
-static int getMatch(int state, int rowColIndex, bool isCannon, bool isCol)
+static int getMatch(int state, int rowColIndex, bool isCannon, bool isRotate)
 {
     int match = 0;
     for (int isHigh = 0; isHigh < 2; ++isHigh) {
         int direction = isHigh ? 1 : -1,
-            endIndex = isHigh ? (isCol ? BOARDROWNUM : BOARDCOLNUM) - 1 : 0; // 每行列数或每列行数
+            endIndex = isHigh ? (isRotate ? BOARDROWNUM : BOARDCOLNUM) - 1 : 0; // 每行列数或每列行数
         bool skip = false; // 炮是否已跳
         for (int i = direction * (rowColIndex + direction); i <= endIndex; ++i) {
             int index = direction * i;
@@ -444,34 +451,34 @@ static void initRookCannonCanMove()
 {
     for (Kind kind = ROOK; kind <= CANNON; ++kind) {
         bool isCannon = kind == CANNON;
-        for (int isCol = 0; isCol < 2; ++isCol) {
-            int stateTotal = isCol ? COLSTATEMAX : ROWSTATEMAX,
-                length = isCol ? BOARDROWNUM : BOARDCOLNUM;
+        for (int isRotate = 0; isRotate < 2; ++isRotate) {
+            int stateTotal = isRotate ? COLSTATEMAX : ROWSTATEMAX,
+                length = isRotate ? BOARDROWNUM : BOARDCOLNUM;
             for (int rowCloIndex = 0; rowCloIndex < length; ++rowCloIndex) {
 #ifdef DEBUGROOKCANNON1
                 char temp[32], temp2[32];
                 int count = 0;
                 printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
                     isCannon ? "Cannon" : "Rook",
-                    isCol ? "Col" : "Row",
-                    getBitStr(temp, INTBITAT(rowCloIndex), isCol));
+                    isRotate ? "Col" : "Row",
+                    getBitStr(temp, INTBITAT(rowCloIndex), isRotate));
 #endif
 
                 Board* moveMatchs = (isCannon
-                        ? (isCol ? CannonColMove[rowCloIndex] : CannonRowMove[rowCloIndex])
-                        : (isCol ? RookColMove[rowCloIndex] : RookRowMove[rowCloIndex]));
+                        ? (isRotate ? CannonColMove[rowCloIndex] : CannonRowMove[rowCloIndex])
+                        : (isRotate ? RookColMove[rowCloIndex] : RookRowMove[rowCloIndex]));
                 for (int state = 0; state < stateTotal; ++state) {
                     // 本状态当前行或列位置无棋子
                     if (!INTBITHAS(state, rowCloIndex))
                         continue;
 
-                    int match = getMatch(state, rowCloIndex, isCannon, isCol);
+                    int match = getMatch(state, rowCloIndex, isCannon, isRotate);
                     if (match == 0) {
-                        // printf("match==0: %s %s", getBitStr(temp, state, isCol), getBitStr(temp2, match, isCol));
+                        // printf("match==0: %s %s", getBitStr(temp, state, isRotate), getBitStr(temp2, match, isRotate));
                         continue;
                     }
 
-                    if (isCol) {
+                    if (isRotate) {
                         Board colMatch = 0;
                         for (int row = 0; row < BOARDROWNUM; ++row) {
                             if (match & INTBITAT(row))
@@ -481,7 +488,7 @@ static void initRookCannonCanMove()
                     } else
                         moveMatchs[state] = match;
 #ifdef DEBUGROOKCANNON1
-                    printf("%s %s", getBitStr(temp, state, isCol), getBitStr(temp2, match, isCol));
+                    printf("%s %s", getBitStr(temp, state, isRotate), getBitStr(temp2, match, isRotate));
                     if (count % 5 == 4)
                         printf("\n");
                     else if (count != (stateTotal >> 1) - 1)
@@ -497,8 +504,8 @@ static void initRookCannonCanMove()
                 char temp[32];
                 printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
                     isCannon ? "Cannon" : "Rook",
-                    isCol ? "Col" : "Row",
-                    getBitStr(temp, INTBITAT(rowCloIndex), isCol));
+                    isRotate ? "Col" : "Row",
+                    getBitStr(temp, INTBITAT(rowCloIndex), isRotate));
 
                 char boardStr[stateTotal * (BOARDROWNUM + 2) * 16];
                 getBoardArrayStr(boardStr, moveMatchs, stateTotal, BOARDCOLNUM, false, false);
@@ -592,9 +599,57 @@ Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces)
         | (CannonColMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
 }
 
-char* getBitStr(char* bitStr, int value, bool isCol)
+void turnColorKindPieces(ChessPosition* chess, Color color, Kind kind, Board turnBoard, Board rotateTurnBoard)
 {
-    if (isCol)
+    chess->pieces[color][kind] ^= turnBoard;
+
+    chess->calPieces[color] ^= turnBoard;
+    chess->calPieces[ALLCOLOR] ^= turnBoard;
+    chess->calPieces[ROTATE] ^= rotateTurnBoard;
+}
+
+void traverseColorPieces(ChessPosition* chess, Color color,
+    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
+{
+    GetIndexFunc getIndexFunc = getNonZeroIndex(chess, color);
+    for (Kind kind = KING; kind <= PAWN; ++kind) {
+        Board board = chess->pieces[color][kind];
+        while (board) {
+            int index = getIndexFunc(board);
+            // 执行针对遍历元素的操作函数
+            func(chess, color, kind, index, arg1, arg2);
+
+            board ^= BoardMask[index];
+        }
+    }
+}
+
+bool isEqual(ChessPosition achess, ChessPosition bchess)
+{
+    if (achess.player != bchess.player)
+        return false;
+
+    for (Color color = RED; color <= BLACK; color++) {
+        for (Kind kind = KING; kind < NONKIND; kind++)
+            if (achess.pieces[color][kind] != bchess.pieces[color][kind])
+                return false;
+    }
+
+    if (achess.bottomColor != bchess.bottomColor)
+        return false;
+
+    for (Color color = RED; color < NONCOLOR; color++) {
+        if (achess.calPieces[color] != bchess.calPieces[color])
+            return false;
+    }
+
+    return true;
+}
+
+static char* getBitStr(char* bitStr, int value, bool isRotate)
+{
+    if (isRotate)
         snprintf(bitStr, 64, BINARYPATTERN10, BYTEBINARY10(value));
     else
         snprintf(bitStr, 64, BINARYPATTERN9, BYTEBINARY9(value));
@@ -602,20 +657,15 @@ char* getBitStr(char* bitStr, int value, bool isCol)
     return bitStr;
 }
 
-char* getBoardStr(char* boardStr, Board board)
+static void getBoardStr(char boardStr[][16], Board board, bool isRotate)
 {
-    char temp[128], temp2[64];
-    strcpy(boardStr, "   ABCDEFGHI\n");
-    for (int row = 0; row < BOARDROWNUM; ++row) {
-        snprintf(temp, 128, "%d: %s\n",
-            row, getBitStr(temp2, (board >> ROWBASEOFFSET(row)) & 0x1FF, false));
-        strcat(boardStr, temp);
-    }
-
-    return boardStr;
+    int rowNum = isRotate ? BOARDCOLNUM : BOARDROWNUM,
+        mode = isRotate ? 0x3FF : 0x1FF;
+    for (int row = 0; row < rowNum; ++row)
+        getBitStr(boardStr[row], (board >> (isRotate ? COLBASEOFFSET(row) : ROWBASEOFFSET(row))) & mode, isRotate);
 }
 
-char* getBoardArrayStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol)
+char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int colNum, bool showZero, bool isRotate)
 {
     if (length < colNum)
         colNum = length;
@@ -623,12 +673,12 @@ char* getBoardArrayStr(char* boardStr, const Board* boards, int length, int colN
     char temp[64],
         indexRowStr[colNum * 16],
         nullRowStr[colNum * 16];
-    strcpy(nullRowStr, "  ");
+    strcpy(nullRowStr, "   ");
     for (int col = 0; col < colNum; ++col)
-        strcat(nullRowStr, isCol ? " ABCDEFGHIJ" : " ABCDEFGHI");
+        strcat(nullRowStr, isRotate ? "ABCDEFGHIJ " : "ABCDEFGHI ");
     strcat(nullRowStr, "\n");
 
-    strcpy(boardStr, "");
+    strcpy(boardArrayStr, "");
     Board nonZeroBoards[length];
     if (!showZero) {
         int count = 0;
@@ -640,51 +690,121 @@ char* getBoardArrayStr(char* boardStr, const Board* boards, int length, int colN
         length = count;
     }
     for (int index = 0; index < length; index += colNum) {
+        char boardStr[colNum][BOARDROWNUM][16];
         strcpy(indexRowStr, "   ");
-        for (int col = 0; col < colNum; ++col) {
+        for (int col = 0; col < colNum && index + col < length; ++col) {
             snprintf(temp, 16, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
+
+            getBoardStr(boardStr[col], boards[index + col], isRotate);
         }
         strcat(indexRowStr, "\n");
-        strcat(boardStr, indexRowStr);
-        strcat(boardStr, nullRowStr);
+        strcat(boardArrayStr, indexRowStr);
+        strcat(boardArrayStr, nullRowStr);
 
-        int totalRow = isCol ? BOARDCOLNUM : BOARDROWNUM,
-            totalCol = !isCol ? BOARDCOLNUM : BOARDROWNUM,
-            mode = !isCol ? 0x1FF : 0x3FF;
+        int totalRow = isRotate ? BOARDCOLNUM : BOARDROWNUM;
         for (int row = 0; row < totalRow; ++row) {
             snprintf(temp, 16, "%d: ", row);
-            strcat(boardStr, temp);
-            for (int col = 0; col < colNum && index + col < length; ++col) {
-                int rowOrCol = (boards[index + col] >> (row * totalCol)) & mode;
-                getBitStr(temp, rowOrCol, isCol);
-                strcat(boardStr, temp);
-            }
-            strcat(boardStr, "\n");
-        }
-        // strcat(boardStr, "\n");
-    }
-    snprintf(temp, 32, "count: %d\n", length);
-    strcat(boardStr, temp);
+            strcat(boardArrayStr, temp);
+            for (int col = 0; col < colNum && index + col < length; ++col)
+                strcat(boardArrayStr, boardStr[col][row]);
 
-    return boardStr;
+            strcat(boardArrayStr, "\n");
+        }
+    }
+    snprintf(temp, 32, "boardCount: %d\n", length);
+    strcat(boardArrayStr, temp);
+
+    return boardArrayStr;
 }
 
-char* getMoveBoardsStr(char* moveStr, const MoveBoard* moveBoards, int count)
+char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int colNum)
 {
-    strcpy(moveStr, "");
-    char temp[1024],
-        boardStr[512];
-    for (int index = 0; index < count; ++index) {
-        MoveBoard moveBoard = moveBoards[index];
-        snprintf(temp, 1024, "kind: %d fromIndex:%2d movtTo:\n%s",
-            moveBoard.kind, moveBoard.fromIndex,
-            getBoardStr(boardStr, moveBoard.moveTo));
+    if (length < colNum)
+        colNum = length;
 
-        strcat(moveStr, temp);
+    char temp[64],
+        nullRowStr[colNum * 16];
+    strcpy(nullRowStr, "   ");
+    for (int col = 0; col < colNum; ++col)
+        strcat(nullRowStr, "ABCDEFGHI ");
+    strcat(nullRowStr, "\n");
+
+    strcpy(moveArrayStr, "");
+    for (int index = 0; index < length; index += colNum) {
+        char boardStr[colNum][BOARDROWNUM][16];
+        strcat(moveArrayStr, "   ");
+        for (int col = 0; col < colNum && index + col < length; ++col) {
+            Move move = moves[index + col];
+            snprintf(temp, 64, "K:%d f:%2d  ", move.kind, move.index);
+            strcat(moveArrayStr, temp);
+
+            getBoardStr(boardStr[col], move.moveTo, false);
+        }
+        strcat(moveArrayStr, "\n");
+        strcat(moveArrayStr, nullRowStr);
+
+        for (int row = 0; row < BOARDROWNUM; ++row) {
+            snprintf(temp, 16, "%d: ", row);
+            strcat(moveArrayStr, temp);
+            for (int col = 0; col < colNum && index + col < length; ++col)
+                strcat(moveArrayStr, boardStr[col][row]);
+
+            strcat(moveArrayStr, "\n");
+        }
     }
 
-    return moveStr;
+    return moveArrayStr;
+}
+
+static void setBoardNames(ChessPosition* chess, Color color, Kind kind, int index, void* boardStr, void* arg2)
+{
+    Seat seat = Seats[index];
+    ((char*)boardStr)[seat.row * (BOARDCOLNUM + 1) + seat.col] = Chars[color][kind];
+}
+
+char* getChessPositionStr(char* chessStr, ChessPosition* chess)
+{
+    static const char* BoardStr = "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n";
+
+    const char* colorStrs[] = { "RED", "BLACK" };
+    char temp[KINDNUM * (BOARDROWNUM + 2) * 16];
+    snprintf(temp, 128, "player: %s\n", colorStrs[chess->player]);
+    strcpy(chessStr, temp);
+    for (Color color = RED; color <= BLACK; ++color) {
+        snprintf(temp, 32, "chess->pieces[%s][Kind]:\n", colorStrs[!color]);
+        strcat(chessStr, temp);
+
+        getBoardArrayStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, true, false);
+        strcat(chessStr, temp);
+    }
+
+    snprintf(temp, 128, "calPieces[Color]: \nRED:         BLACK:    ALLCOLOR:\n");
+    strcat(chessStr, temp);
+    getBoardArrayStr(temp, chess->calPieces, ALLCOLOR + 1, KINDNUM, true, false);
+    strcat(chessStr, temp);
+
+    strcat(chessStr, "ROTATE: \n");
+    getBoardArrayStr(temp, &chess->calPieces[ROTATE], 1, KINDNUM, true, true);
+    strcat(chessStr, temp);
+
+    strcat(chessStr, "chessBoardStr:\n");
+    strcpy(temp, BoardStr);
+    Color colors[COLORNUM] = { RED, BLACK };
+    for (int i = 0; i < COLORNUM; ++i)
+        traverseColorPieces(chess, colors[i], setBoardNames, temp, NULL);
+    strcat(chessStr, temp);
+
+    return chessStr;
 }
 
 void initData()

@@ -45,11 +45,14 @@
 
 typedef __uint128_t Board; // 只使用最低的90位
 
+typedef int (*GetIndexFunc)(Board);
+
 typedef enum Color {
     RED,
     BLACK,
     ALLCOLOR,
-    ROTATE
+    ROTATE,
+    NONCOLOR
 } Color;
 
 typedef enum Kind {
@@ -59,13 +62,9 @@ typedef enum Kind {
     KNIGHT,
     ROOK,
     CANNON,
-    PAWN
+    PAWN,
+    NONKIND
 } Kind;
-
-// typedef struct Piece {
-//     Color color;
-//     Kind kind;
-// } Piece;
 
 typedef struct Seat {
     int row;
@@ -81,16 +80,19 @@ typedef struct ChessPosition {
 
     // 计算中间存储数据(基本局面改动时更新)
     Color bottomColor;
-    Board calPieces[ROTATE + 1];
+    Board calPieces[NONCOLOR];
+
 } ChessPosition;
 
-typedef struct MoveBoard {
+typedef struct Move {
     Color color;
     Kind kind;
-    int fromIndex;
+    int index;
 
     Board moveTo;
-} MoveBoard;
+} Move;
+
+extern const char Chars[COLORNUM][KINDNUM];
 
 extern Seat Seats[BOARDLENGTH];
 extern int Rotate[BOARDLENGTH];
@@ -102,15 +104,17 @@ extern Board AdvisorMove[BOARDLENGTH];
 extern Board PawnMove[BOARDLENGTH][2];
 
 // 获取非0位的索引位置
-unsigned int getLowNonZeroIndexFromUInt(unsigned int value);
+// unsigned int getLowNonZeroIndexFromUInt(unsigned int value);
 
-unsigned int getLowNonZeroIndexFromRowCol(unsigned int value);
+// unsigned int getLowNonZeroIndexFromRowCol(unsigned int value);
 
-int getLowNonZeroIndexs(int indexs[], int value);
+// int getLowNonZeroIndexs(int indexs[], int value);
 
-int getLowNonZeroIndex(Board board);
+// int getLowNonZeroIndex(Board board);
 
-int getHighNonZeroIndex(Board board);
+// int getHighNonZeroIndex(Board board);
+
+GetIndexFunc getNonZeroIndex(ChessPosition* chess, Color color);
 
 // 获取某种棋子在当前状态某个位置可移动的位棋盘
 // Board getKingMove(int fromIndex);return KingMove[fromIndex];
@@ -127,14 +131,20 @@ Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces);
 
 // Board getPawnMove(int fromIndex, bool isBottom);return PawnMove[fromIndex][isBottom];
 
-// 打印显示位状态
-char* getBitStr(char* bitStr, int value, bool isCol);
+// 清除原位置，置位新位置
+void turnColorKindPieces(ChessPosition* chess, Color color, Kind kind, Board turnBoard, Board rotateTurnBoard);
 
-char* getBoardStr(char* boardStr, Board board);
+void traverseColorPieces(ChessPosition* chess, Color color,
+    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2);
 
-char* getBoardArrayStr(char* boardStr, const Board* boards, int length, int colNum, bool showZero, bool isCol);
+bool isEqual(ChessPosition achess, ChessPosition bchess);
 
-char* getMoveBoardsStr(char* moveStr, const MoveBoard* moveBoards, int count);
+char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int colNum, bool showZero, bool isRotate);
+
+char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int colNum);
+
+char* getChessPositionStr(char* chessStr, ChessPosition* chess);
 
 // 初始化预计算的数据
 void initData();
