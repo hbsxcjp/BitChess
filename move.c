@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 
-// #define DEBUGFILTERKILLEDMOVE
+#define DEBUGFILTERKILLEDMOVE
 
 Kind doMove(ChessPosition* chess, Color color, Kind kind, int fromIndex, int toIndex)
 {
@@ -87,7 +87,7 @@ static Board getColorMove(ChessPosition* chess, Color color)
     return colorMove;
 }
 
-static void filterKilledMove(ChessPosition* chess, Color color, Kind kind, int toIndex, void* pfromIndex, void* pmoveTo)
+static void filterKilledMove(ChessPosition* chess, Color color, Kind kind, int toIndex, void* pfromIndex, void* pmove)
 {
 #ifdef DEBUGFILTERKILLEDMOVE
     ChessPosition tempChess = *chess;
@@ -96,7 +96,7 @@ static void filterKilledMove(ChessPosition* chess, Color color, Kind kind, int t
     Kind eatKind = doMove(chess, color, kind, fromIndex, toIndex);
     // 排除被杀将的位置
     if (getColorMove(chess, !color) & chess->pieces[color][KING])
-        *(Board*)pmoveTo ^= BoardMask[toIndex];
+        *(Board*)pmove ^= BoardMask[toIndex];
 
     undoMove(chess, color, kind, toIndex, fromIndex, eatKind);
 
@@ -110,26 +110,19 @@ static void filterKilledMove(ChessPosition* chess, Color color, Kind kind, int t
 #endif
 }
 
-static Move getMoveTo(ChessPosition* chess, Color color, Kind kind, int fromIndex)
+static void getCanMove(ChessPosition* chess, Color color, Kind kind, int fromIndex, void* moves, void* count)
 {
-    Board moveTo = getMove(chess, color, kind, fromIndex),
-          tempMove = moveTo;
+    Board move = getMove(chess, color, kind, fromIndex);
+    traverseColorKindPieces(chess, color, kind, getNonZeroIndex(chess, color), move,
+        filterKilledMove, &fromIndex, &move);
 
-    traverseColorKindPieces(chess, color, kind, getNonZeroIndex(chess, color), tempMove,
-        filterKilledMove, &fromIndex, &moveTo);
-
-    return (Move) { color, kind, fromIndex, moveTo };
+    ((Move*)moves)[(*(int*)count)++] = (Move) { color, kind, fromIndex, move };
 }
 
-static void getMoveTos(ChessPosition* chess, Color color, Kind kind, int index, void* moves, void* count)
-{
-    ((Move*)moves)[(*(int*)count)++] = getMoveTo(chess, color, kind, index);
-}
-
-int getChessPositionMoveTos(Move moves[], ChessPosition* chess, Color color)
+int getChessPositionCanMove(Move moves[], ChessPosition* chess, Color color)
 {
     int count = 0;
-    traverseColorPieces(chess, color, getMoveTos, moves, &count);
+    traverseColorPieces(chess, color, getCanMove, moves, &count);
 
     return count;
 }

@@ -119,12 +119,10 @@ char* getFenFromChessPosition(char* fen, ChessPosition* chess)
     char pieChars[BOARDLENGTH + 1];
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
-
-    Color colors[COLORNUM] = { RED, BLACK };
-    for (int i = 0; i < COLORNUM; ++i)
-        traverseColorPieces(chess, colors[i], setPieChars, pieChars, NULL);
-
+        
+    traverseAllColorPieces(chess, setPieChars, pieChars, NULL);
     pieChars[BOARDLENGTH] = EndChar;
+    
     return getFenFromPieChars(fen, pieChars);
 }
 
@@ -157,11 +155,11 @@ void testChessPosition()
         printf("testChessPosition:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n",
             chessStr, afen, setFen, strcmp(setFen, afen));
 
-        printf("getChessPositionMoveTos:\n");
+        printf("getChessPositionCanMove:\n");
         Move moves[MOVEBOARDMAXCOUNT];
         Color colors[COLORNUM] = { RED, BLACK };
         for (int i = 0; i < COLORNUM; ++i) {
-            int count = getChessPositionMoveTos(moves, &chess, colors[i]);
+            int count = getChessPositionCanMove(moves, &chess, colors[i]);
             printf("%smoveCount:%2d\n", getMoveArrayStr(chessStr, moves, count, KINDNUM + 1), count);
         }
     }

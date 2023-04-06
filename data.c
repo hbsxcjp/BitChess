@@ -555,14 +555,14 @@ Board getBishopMove(int fromIndex, Board allPieces)
 {
     Seat fromSeat = Seats[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
-    bool isNonTop = row != 0 && row != 5,
-         isNonBottom = row != 4 && row != BOARDROWNUM - 1,
-         isNonLeft = col > 0,
-         isNonRight = col < BOARDCOLNUM - 1;
-    int state = ((isNonTop && isNonLeft && !(allPieces & BoardMask[fromIndex - BOARDCOLNUM - 1]) ? 0 : INTBITAT(LEGCOUNT - 1))
-        | (isNonTop && isNonRight && !(allPieces & BoardMask[fromIndex - BOARDCOLNUM + 1]) ? 0 : INTBITAT(LEGCOUNT - 2))
-        | (isNonBottom && isNonLeft && !(allPieces & BoardMask[fromIndex + BOARDCOLNUM - 1]) ? 0 : INTBITAT(LEGCOUNT - 3))
-        | (isNonBottom && isNonRight && !(allPieces & BoardMask[fromIndex + BOARDCOLNUM + 1]) ? 0 : INTBITAT(LEGCOUNT - 4)));
+    bool isTop = row == 0 || row == 5,
+         isBottom = row == 4 || row == BOARDROWNUM - 1,
+         isLeft = col == 0,
+         isRight = col == BOARDCOLNUM - 1;
+    int state = ((isTop || isLeft || (allPieces & BoardMask[fromIndex - BOARDCOLNUM - 1]) ? INTBITAT(LEGCOUNT - 1) : 0)
+        | (isTop || isRight || (allPieces & BoardMask[fromIndex - BOARDCOLNUM + 1]) ? INTBITAT(LEGCOUNT - 2) : 0)
+        | (isBottom || isLeft || (allPieces & BoardMask[fromIndex + BOARDCOLNUM - 1]) ? INTBITAT(LEGCOUNT - 3) : 0)
+        | (isBottom || isRight || (allPieces & BoardMask[fromIndex + BOARDCOLNUM + 1]) ? INTBITAT(LEGCOUNT - 4) : 0));
 
     return BishopMove[fromIndex][state];
 }
@@ -571,10 +571,10 @@ Board getKnightMove(int fromIndex, Board allPieces)
 {
     Seat fromSeat = Seats[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
-    int state = ((row > 0 && !(allPieces & BoardMask[fromIndex - BOARDCOLNUM]) ? 0 : INTBITAT(LEGCOUNT - 1))
-        | (col > 0 && !(allPieces & BoardMask[fromIndex - 1]) ? 0 : INTBITAT(LEGCOUNT - 2))
-        | (col < BOARDCOLNUM - 1 && !(allPieces & BoardMask[fromIndex + 1]) ? 0 : INTBITAT(LEGCOUNT - 3))
-        | (row < BOARDROWNUM - 1 && !(allPieces & BoardMask[fromIndex + BOARDCOLNUM]) ? 0 : INTBITAT(LEGCOUNT - 4)));
+    int state = ((row == 0 || (allPieces & BoardMask[fromIndex - BOARDCOLNUM]) ? INTBITAT(LEGCOUNT - 1) : 0)
+        | (col == 0 || (allPieces & BoardMask[fromIndex - 1]) ? INTBITAT(LEGCOUNT - 2) : 0)
+        | (col == BOARDCOLNUM - 1 || (allPieces & BoardMask[fromIndex + 1]) ? INTBITAT(LEGCOUNT - 3) : 0)
+        | (row == BOARDROWNUM - 1 || (allPieces & BoardMask[fromIndex + BOARDCOLNUM]) ? INTBITAT(LEGCOUNT - 4) : 0));
 
     return KnightMove[fromIndex][state];
 }
@@ -626,10 +626,17 @@ void traverseColorPieces(ChessPosition* chess, Color color,
     void* arg1, void* arg2)
 {
     GetIndexFunc getIndexFunc = getNonZeroIndex(chess, color);
-    for (Kind kind = KING; kind <= PAWN; ++kind) {
+    for (Kind kind = KING; kind <= PAWN; ++kind)
         traverseColorKindPieces(chess, color, kind, getIndexFunc, chess->pieces[color][kind],
             func, arg1, arg2);
-    }
+}
+
+void traverseAllColorPieces(ChessPosition* chess,
+    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
+{
+    for (Color color = RED; color <= BLACK; ++color)
+        traverseColorPieces(chess, color, func, arg1, arg2);
 }
 
 bool isEqual(ChessPosition achess, ChessPosition bchess)
@@ -806,9 +813,7 @@ char* getChessPositionStr(char* chessStr, ChessPosition* chess)
 
     strcat(chessStr, "chessBoardStr:\n");
     strcpy(temp, BoardStr);
-    Color colors[COLORNUM] = { RED, BLACK };
-    for (int i = 0; i < COLORNUM; ++i)
-        traverseColorPieces(chess, colors[i], setBoardNames, temp, NULL);
+    traverseAllColorPieces(chess, setBoardNames, temp, NULL);
     strcat(chessStr, temp);
 
     return chessStr;
