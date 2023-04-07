@@ -15,6 +15,14 @@
 
 const char Chars[COLORNUM][KINDNUM] = { "KABNRCP", "kabnrcp" };
 
+const wchar_t Names[COLORNUM][KINDNUM] = { L"帅仕相马车炮兵", L"将士象马车炮卒" };
+
+// static const wchar_t NumChar[COLORNUM][BOARDCOLNUM] = { L"一二三四五六七八九", L"１２３４５６７８９" };
+
+// static const wchar_t PreChar[] = L"前中后";
+
+// static const wchar_t MoveChar[] = L"退平进";
+
 Coord Coords[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
 Board BoardMask[BOARDLENGTH];
@@ -720,7 +728,7 @@ char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int
         char boardStr[colNum][BOARDROWNUM][16];
         strcpy(indexRowStr, "   ");
         for (int col = 0; col < colNum && index + col < length; ++col) {
-            snprintf(temp, 16, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
+            snprintf(temp, 64, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
 
             getBoardStr(boardStr[col], boards[index + col], isRotate);
@@ -801,7 +809,7 @@ char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int col
     return moveArrayStr;
 }
 
-static void setBoardNames(ChessPosition* chess, Color color, Kind kind, int index, void* boardStr, void* arg2)
+static void setBoardChars(ChessPosition* chess, Color color, Kind kind, int index, void* boardStr, void* arg2)
 {
     Coord coord = Coords[index];
     ((char*)boardStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Chars[color][kind];
@@ -843,8 +851,36 @@ char* getChessPositionStr(char* chessStr, ChessPosition* chess)
 
     strcat(chessStr, "chessBoardStr:\n");
     strcpy(temp, BoardStr);
-    traverseAllColorPieces(chess, setBoardNames, temp, NULL);
+    traverseAllColorPieces(chess, setBoardChars, temp, NULL);
     strcat(chessStr, temp);
+
+    return chessStr;
+}
+
+static void setBoardNames(ChessPosition* chess, Color color, Kind kind, int index, void* boardWStr, void* arg2)
+{
+    Coord coord = Coords[index];
+    ((wchar_t*)boardWStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Names[color][kind];
+}
+
+wchar_t* getChessPositionWStr(wchar_t* chessStr, ChessPosition* chess)
+{
+    static const wchar_t* BoardStr = L"－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n";
+
+    wchar_t temp[KINDNUM * (BOARDROWNUM + 2) * 16];
+    wcscpy(chessStr, L"chessBoardWStr:\n");
+    wcscpy(temp, BoardStr);
+    traverseAllColorPieces(chess, setBoardNames, temp, NULL);
+    wcscat(chessStr, temp);
 
     return chessStr;
 }

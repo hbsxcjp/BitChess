@@ -2,6 +2,7 @@
 #define DATA_H
 
 #include <stdbool.h>
+#include <wchar.h>
 
 #define COLORNUM 2
 #define KINDNUM 7
@@ -93,6 +94,7 @@ typedef struct Move {
 } Move;
 
 extern const char Chars[COLORNUM][KINDNUM];
+extern const wchar_t Names[COLORNUM][KINDNUM];
 
 extern Coord Coords[BOARDLENGTH];
 extern int Rotate[BOARDLENGTH];
@@ -153,6 +155,8 @@ char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int
 char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int colNum);
 
 char* getChessPositionStr(char* chessStr, ChessPosition* chess);
+
+wchar_t* getChessPositionWStr(wchar_t* chessStr, ChessPosition* chess);
 
 // 初始化预计算的数据
 void initData();

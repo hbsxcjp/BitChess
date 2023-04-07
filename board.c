@@ -17,14 +17,6 @@ static const char EndChar = '\x0';
 
 static const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
 
-static const wchar_t Names[COLORNUM][KINDNUM] = { L"帅仕相马车炮兵", L"将士象马车炮卒" };
-
-// static const wchar_t NumChar[COLORNUM][BOARDCOLNUM] = { L"一二三四五六七八九", L"１２３４５６７８９" };
-
-// static const wchar_t PreChar[] = L"前中后";
-
-// static const wchar_t MoveChar[] = L"退平进";
-
 static inline Color getColor(char ch)
 {
     return isupper(ch) ? RED : BLACK;
@@ -119,10 +111,10 @@ char* getFenFromChessPosition(char* fen, ChessPosition* chess)
     char pieChars[BOARDLENGTH + 1];
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
-        
+
     traverseAllColorPieces(chess, setPieChars, pieChars, NULL);
     pieChars[BOARDLENGTH] = EndChar;
-    
+
     return getFenFromPieChars(fen, pieChars);
 }
 
@@ -162,5 +154,9 @@ void testChessPosition()
             int count = getChessPositionCanMove(moves, &chess, colors[i]);
             printf("%smoveCount:%2d\n", getMoveArrayStr(chessStr, moves, count, KINDNUM + 1), count);
         }
+
+        wchar_t chessWStr[1024];
+        getChessPositionWStr(chessWStr, &chess);
+        wprintf(L"%ls\n", chessWStr);
     }
 }
