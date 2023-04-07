@@ -66,10 +66,10 @@ typedef enum Kind {
     NONKIND
 } Kind;
 
-typedef struct Seat {
+typedef struct Coord {
     int row;
     int col;
-} Seat;
+} Coord;
 
 typedef struct ChessPosition {
     // 当前
@@ -94,7 +94,7 @@ typedef struct Move {
 
 extern const char Chars[COLORNUM][KINDNUM];
 
-extern Seat Seats[BOARDLENGTH];
+extern Coord Coords[BOARDLENGTH];
 extern int Rotate[BOARDLENGTH];
 
 extern Board BoardMask[BOARDLENGTH];

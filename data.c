@@ -15,7 +15,7 @@
 
 const char Chars[COLORNUM][KINDNUM] = { "KABNRCP", "kabnrcp" };
 
-Seat Seats[BOARDLENGTH];
+Coord Coords[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
 Board BoardMask[BOARDLENGTH];
 
@@ -198,6 +198,19 @@ GetIndexFunc getNonZeroIndex(ChessPosition* chess, Color color)
     return color == chess->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
 }
 
+int getBoardNonZeroIndexs(int indexs[], Board board)
+{
+    int count = 0;
+    while (board) {
+        int index = getLowNonZeroIndex(board);
+        indexs[count++] = index;
+
+        board ^= BOARDAT(index);
+    }
+
+    return count;
+}
+
 static bool isValidKing(int row, int col)
 {
     return (row < 3 || row > 6) && (col > 2 && col < 6);
@@ -226,7 +239,7 @@ static void initBaseData()
     int index = 0;
     for (int row = 0; row < BOARDROWNUM; ++row) {
         for (int col = 0; col < BOARDCOLNUM; ++col) {
-            Seats[index] = (Seat) { row, col };
+            Coords[index] = (Coord) { row, col };
             Rotate[index] = col * BOARDROWNUM + row;
             BoardMask[index] = BOARDAT(index);
 
@@ -237,9 +250,9 @@ static void initBaseData()
 #ifdef DEBUGBASEDATA
     char temp[64],
         boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
-    strcpy(boardStr, "Seats[90]:\n");
+    strcpy(boardStr, "Coords[90]:\n");
     for (int i = 0; i < BOARDLENGTH; ++i) {
-        snprintf(temp, 64, "seat:(%d, %d), ", Seats[i].row, Seats[i].col);
+        snprintf(temp, 64, "coord:(%d, %d), ", Coords[i].row, Coords[i].col);
         strcat(boardStr, temp);
         if (i % BOARDCOLNUM == BOARDCOLNUM - 1)
             strcat(boardStr, "\n");
@@ -262,7 +275,7 @@ static void initBaseData()
 static void initKingMove()
 {
     for (int index = 0; index < BOARDLENGTH; ++index) {
-        Seat fromSeat = Seats[index];
+        Coord fromSeat = Coords[index];
         int row = fromSeat.row, col = fromSeat.col;
         if (!isValidKing(row, col))
             continue;
@@ -291,7 +304,7 @@ static void initKingMove()
 static void initAdvisorMove()
 {
     for (int index = 0; index < BOARDLENGTH; ++index) {
-        Seat fromSeat = Seats[index];
+        Coord fromSeat = Coords[index];
         int row = fromSeat.row, col = fromSeat.col;
         if (!isValidAdvisor(row, col))
             continue;
@@ -319,7 +332,7 @@ static void initAdvisorMove()
 static void initBishopMove()
 {
     for (int index = 0; index < BOARDLENGTH; ++index) {
-        Seat fromSeat = Seats[index];
+        Coord fromSeat = Coords[index];
         int row = fromSeat.row, col = fromSeat.col;
         if (!isValidBishop(row, col))
             continue;
@@ -364,7 +377,7 @@ static void initBishopMove()
 static void initKninghtCanMove()
 {
     for (int index = 0; index < BOARDLENGTH; ++index) {
-        Seat fromSeat = Seats[index];
+        Coord fromSeat = Coords[index];
         int row = fromSeat.row, col = fromSeat.col;
         for (int state = 0; state < INTBITAT(LEGCOUNT); ++state) {
             int realState = state;
@@ -519,7 +532,7 @@ static void initRookCannonCanMove()
 static void initPawnMove()
 {
     for (int index = 0; index < BOARDLENGTH; ++index) {
-        Seat fromSeat = Seats[index];
+        Coord fromSeat = Coords[index];
         int row = fromSeat.row, col = fromSeat.col;
         for (int isBottom = 0; isBottom < 2; ++isBottom) {
 
@@ -553,7 +566,7 @@ static void initPawnMove()
 
 Board getBishopMove(int fromIndex, Board allPieces)
 {
-    Seat fromSeat = Seats[fromIndex];
+    Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
     bool isTop = row == 0 || row == 5,
          isBottom = row == 4 || row == BOARDROWNUM - 1,
@@ -569,7 +582,7 @@ Board getBishopMove(int fromIndex, Board allPieces)
 
 Board getKnightMove(int fromIndex, Board allPieces)
 {
-    Seat fromSeat = Seats[fromIndex];
+    Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
     int state = ((row == 0 || (allPieces & BoardMask[fromIndex - BOARDCOLNUM]) ? INTBITAT(LEGCOUNT - 1) : 0)
         | (col == 0 || (allPieces & BoardMask[fromIndex - 1]) ? INTBITAT(LEGCOUNT - 2) : 0)
@@ -581,7 +594,7 @@ Board getKnightMove(int fromIndex, Board allPieces)
 
 Board getRookMove(int fromIndex, Board allPieces, Board rotatePieces)
 {
-    Seat fromSeat = Seats[fromIndex];
+    Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col,
         rowOffset = ROWBASEOFFSET(row);
 
@@ -591,7 +604,7 @@ Board getRookMove(int fromIndex, Board allPieces, Board rotatePieces)
 
 Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces)
 {
-    Seat fromSeat = Seats[fromIndex];
+    Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col,
         rowOffset = ROWBASEOFFSET(row);
 
@@ -768,13 +781,30 @@ char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int col
         }
     }
 
+    for (int index = 0; index < length; ++index) {
+        Move move = moves[index];
+        Coord coord = Coords[move.index];
+        snprintf(temp, 64, "[%c] from:(%02d,%02d) to:", Chars[move.color][move.kind], coord.row, coord.col);
+        strcat(moveArrayStr, temp);
+
+        int indexs[BOARDROWNUM + BOARDCOLNUM];
+        int count = getBoardNonZeroIndexs(indexs, move.moveTo);
+        for (int i = 0; i < count; ++i) {
+            Coord coord = Coords[indexs[i]];
+            snprintf(temp, 64, "(%02d,%02d) ", coord.row, coord.col);
+            strcat(moveArrayStr, temp);
+        }
+
+        strcat(moveArrayStr, "\n");
+    }
+
     return moveArrayStr;
 }
 
 static void setBoardNames(ChessPosition* chess, Color color, Kind kind, int index, void* boardStr, void* arg2)
 {
-    Seat seat = Seats[index];
-    ((char*)boardStr)[seat.row * (BOARDCOLNUM + 1) + seat.col] = Chars[color][kind];
+    Coord coord = Coords[index];
+    ((char*)boardStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Chars[color][kind];
 }
 
 char* getChessPositionStr(char* chessStr, ChessPosition* chess)
