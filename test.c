@@ -1,4 +1,5 @@
 #include "board.h"
+#include "instance.h"
 #include "move.h"
 #include <ctype.h>
 #include <locale.h>
@@ -14,14 +15,18 @@
 int main()
 {
     setlocale(LC_ALL, "zh_CN");
+    // wprintf(L"中华人们共和国\n"); //？
 
     // Test data.c
     initData();
 
     // Test board.c
-    testChessPosition();
+    testBoard();
 
     // Test move.c
+
+    // Test instance.c
+    testInstance();
 
     return 0;
 }

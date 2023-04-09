@@ -9,13 +9,38 @@
 #include <string.h>
 #include <wchar.h>
 
-static const char NullChar = '_';
+// #define DEBUGTESTBOARD
 
-static const char SplitChar = '/';
+void traverseColorKindPieces(Board* board, Color color, Kind kind, GetIndexFunc getIndexFunc, BitBoard bitBoard,
+    void func(Board* board, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
+{
+    while (bitBoard) {
+        int index = getIndexFunc(bitBoard);
+        // 执行针对遍历元素的操作函数
+        func(board, color, kind, index, arg1, arg2);
 
-static const char EndChar = '\x0';
+        bitBoard ^= BoardMask[index];
+    }
+}
 
-static const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
+void traverseColorPieces(Board* board, Color color,
+    void func(Board* board, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
+{
+    GetIndexFunc getIndexFunc = getNonZeroIndex(board, color);
+    for (Kind kind = KING; kind <= PAWN; ++kind)
+        traverseColorKindPieces(board, color, kind, getIndexFunc, board->pieces[color][kind],
+            func, arg1, arg2);
+}
+
+void traverseAllColorPieces(Board* board,
+    void func(Board* board, Color color, Kind kind, int index, void* arg1, void* arg2),
+    void* arg1, void* arg2)
+{
+    for (Color color = RED; color <= BLACK; ++color)
+        traverseColorPieces(board, color, func, arg1, arg2);
+}
 
 static inline Color getColor(char ch)
 {
@@ -33,7 +58,7 @@ static inline wchar_t getPrintName(Color color, Kind kind)
     return (color == BLACK && kind > BISHOP && kind < PAWN) ? L"馬車砲"[kind - KNIGHT] : Names[color][kind];
 }
 
-static char* getPieCharsFromFen(char* pieChars, const char* fen)
+char* getPieCharsFromFen(char* pieChars, const char* fen)
 {
     int len = strlen(fen);
     for (int index = 0, fenIndex = 0; fenIndex < len && index < BOARDLENGTH; ++fenIndex) {
@@ -49,7 +74,7 @@ static char* getPieCharsFromFen(char* pieChars, const char* fen)
     return pieChars;
 }
 
-static char* getFenFromPieChars(char* fen, const char* pieChars)
+char* getFenFromPieChars(char* fen, const char* pieChars)
 {
     int index_F = 0;
     for (int row = 0; row < BOARDROWNUM; ++row) { // 从最高行开始
@@ -75,50 +100,166 @@ static char* getFenFromPieChars(char* fen, const char* pieChars)
     return fen;
 }
 
-ChessPosition* getChessPositionFromFen(ChessPosition* chess, const char* fen)
+Board* getBoardFromFen(Board* board, const char* fen)
 {
     char pieChars[BOARDLENGTH + 1] = {};
     getPieCharsFromFen(pieChars, fen);
 
     char ch;
-    Board turnBoard[COLORNUM][KINDNUM] = {},
-          rotateTurnBoard[COLORNUM][KINDNUM] = {};
     for (int index = 0; index < BOARDLENGTH; ++index) {
         if ((ch = pieChars[index]) != NullChar) {
             Color color = getColor(ch);
             Kind kind = getKind(ch);
-            turnBoard[color][kind] |= BoardMask[index];
-            rotateTurnBoard[color][kind] |= BoardMask[Rotate[index]];
+            BitBoard turnBoard = BoardMask[index],
+                     rotateTurnBoard = BoardMask[Rotate[index]];
+
+            board->pieces[color][kind] ^= turnBoard;
+            board->colorPieces[color] ^= turnBoard;
+
+            board->allPieces ^= turnBoard;
+            board->rotatePieces ^= rotateTurnBoard;
         }
     }
 
-    // 设置分颜色棋盘
-    for (Color color = RED; color <= BLACK; ++color)
-        for (Kind kind = KING; kind <= PAWN; ++kind)
-            turnColorKindPieces(chess, color, kind, turnBoard[color][kind], rotateTurnBoard[color][kind]);
-
-    chess->bottomColor = getNonZeroIndex(chess, RED)(chess->pieces[RED][KING]) > (BOARDLENGTH >> 1) ? RED : BLACK;
-    return chess;
+    board->bottomColor = getNonZeroIndex(board, RED)(board->pieces[RED][KING]) > (BOARDLENGTH >> 1) ? RED : BLACK;
+    return board;
 }
 
-static void setPieChars(ChessPosition* chess, Color color, Kind kind, int index, void* pieChars, void* arg2)
+static void setPieChars(Board* board, Color color, Kind kind, int index, void* pieChars, void* arg2)
 {
     ((char*)pieChars)[index] = Chars[color][kind];
 }
 
-char* getFenFromChessPosition(char* fen, ChessPosition* chess)
+char* getFenFromBoard(char* fen, Board* board)
 {
     char pieChars[BOARDLENGTH + 1];
     for (int i = 0; i < BOARDLENGTH; ++i)
         pieChars[i] = NullChar;
 
-    traverseAllColorPieces(chess, setPieChars, pieChars, NULL);
+    traverseAllColorPieces(board, setPieChars, pieChars, NULL);
     pieChars[BOARDLENGTH] = EndChar;
 
     return getFenFromPieChars(fen, pieChars);
 }
 
-void testChessPosition()
+static void setZobrist(Board* board, Color color, Kind kind, int index, void* zobrist, void* arg2)
+{
+    *(U64*)zobrist ^= Zobrist[color][kind][index];
+}
+
+U64 getZobristFromBoard(Board* board)
+{
+    U64 zobrist = 0;
+    if (board->player == BLACK)
+        zobrist ^= ZobristBlack;
+
+    traverseAllColorPieces(board, setZobrist, &zobrist, NULL);
+    return zobrist;
+}
+
+bool isEqual(Board aboard, Board bboard)
+{
+    if (aboard.player != bboard.player)
+        return false;
+
+    for (Color color = RED; color <= BLACK; color++) {
+        for (Kind kind = KING; kind <= PAWN; kind++)
+            if (aboard.pieces[color][kind] != bboard.pieces[color][kind])
+                return false;
+    }
+
+    if (aboard.bottomColor != bboard.bottomColor)
+        return false;
+
+    for (Color color = RED; color <= BLACK; color++) {
+        if (aboard.colorPieces[color] != bboard.colorPieces[color])
+            return false;
+    }
+
+    return true;
+}
+
+static void setBoardChars(Board* board, Color color, Kind kind, int index, void* boardStr, void* arg2)
+{
+    Coord coord = Coords[index];
+    ((char*)boardStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Chars[color][kind];
+}
+
+char* getBoardStr(char* boardStr, Board* board)
+{
+    static const char* BoardStr = "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n"
+                                  "---------\n";
+
+    const char* colorStrs[] = { "RED", "BLACK" };
+    char temp[KINDNUM * (BOARDROWNUM + 2) * 16];
+    snprintf(temp, 128, "player: %s\n", colorStrs[board->player]);
+    strcpy(boardStr, temp);
+    for (Color color = RED; color <= BLACK; ++color) {
+        snprintf(temp, 32, "board->pieces[%s][Kind]:\n", colorStrs[!color]);
+        strcat(boardStr, temp);
+
+        getBitBoardArrayStr(temp, board->pieces[!color], KINDNUM, KINDNUM, true, false);
+        strcat(boardStr, temp);
+    }
+
+    snprintf(temp, 128, "colorPieces[Color]: \nRED:         BLACK:\n");
+    strcat(boardStr, temp);
+    getBitBoardArrayStr(temp, board->colorPieces, COLORNUM, KINDNUM, true, false);
+    strcat(boardStr, temp);
+
+    strcat(boardStr, "allPieces: \n");
+    getBitBoardArrayStr(temp, &board->allPieces, 1, KINDNUM, true, false);
+    strcat(boardStr, temp);
+
+    strcat(boardStr, "rotatePieces: \n");
+    getBitBoardArrayStr(temp, &board->rotatePieces, 1, KINDNUM, true, true);
+    strcat(boardStr, temp);
+
+    strcat(boardStr, "chessBoardStr:\n");
+    strcpy(temp, BoardStr);
+    traverseAllColorPieces(board, setBoardChars, temp, NULL);
+    strcat(boardStr, temp);
+
+    return boardStr;
+}
+
+static void setBoardNames(Board* board, Color color, Kind kind, int index, void* boardWStr, void* arg2)
+{
+    Coord coord = Coords[index];
+    ((wchar_t*)boardWStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Names[color][kind];
+}
+
+wchar_t* getBoardWStr(wchar_t* boardWStr, Board* board)
+{
+    static const wchar_t* BoardStr = L"－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n"
+                                     "－－－－－－－－－\n";
+
+    wchar_t temp[KINDNUM * (BOARDROWNUM + 2) * 16];
+    wcscpy(boardWStr, L"chessBoardWStr:\n");
+    wcscpy(temp, BoardStr);
+    traverseAllColorPieces(board, setBoardNames, temp, NULL);
+    wcscat(boardWStr, temp);
+
+    return boardWStr;
+}
+
+void testBoard()
 {
 
     const char* fens[] = {
@@ -134,29 +275,48 @@ void testChessPosition()
             pieChars[BOARDLENGTH + 1];
         getPieCharsFromFen(pieChars, afen);
         getFenFromPieChars(fen, pieChars);
+
+#ifdef DEBUGTESTBOARD
         printf("testFenPieChars:\npieChars: %s\nafen: %s\n fen: %s\n fen.Equal: %d\n\n",
             pieChars, afen, fen, strcmp(fen, afen));
+#endif
+        assert(strcmp(afen, fen) == 0);
 
-        char chessStr[4 * 4096],
+        char boardStr[4 * 4096],
             setFen[BOARDLENGTH];
-        ChessPosition chess = {};
-        getChessPositionFromFen(&chess, afen);
-        getChessPositionStr(chessStr, &chess);
-        getFenFromChessPosition(setFen, &chess);
+        Board board = {};
+        getBoardFromFen(&board, afen);
+        getBoardStr(boardStr, &board);
+        getFenFromBoard(setFen, &board);
 
-        printf("testChessPosition:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n",
-            chessStr, afen, setFen, strcmp(setFen, afen));
+#ifdef DEBUGTESTBOARD
+        printf("testBoard:\n%s  afen: %s\nsetFen: %s\nsetFen.Equal: %d\n",
+            boardStr, afen, setFen, strcmp(setFen, afen));
+#endif
+        assert(strcmp(afen, setFen) == 0);
 
-        printf("getChessPositionCanMove:\n");
-        Move moves[MOVEBOARDMAXCOUNT];
+#ifdef DEBUGTESTBOARD
+        printf("getBoardCanMove:\n");
+#endif
+        BitMove bitMoves[MOVEBOARDMAXCOUNT];
         Color colors[COLORNUM] = { RED, BLACK };
         for (int i = 0; i < COLORNUM; ++i) {
-            int count = getChessPositionCanMove(moves, &chess, colors[i]);
-            printf("%smoveCount:%2d\n", getMoveArrayStr(chessStr, moves, count, KINDNUM + 1), count);
+            int count = getBoardCanMove(bitMoves, &board, colors[i]);
+            getMoveArrayStr(boardStr, bitMoves, count, KINDNUM + 1);
+#ifdef DEBUGTESTBOARD
+            printf("%smoveCount:%2d\n", boardStr, count);
+#endif
         }
 
-        wchar_t chessWStr[1024];
-        getChessPositionWStr(chessWStr, &chess);
-        wprintf(L"%ls\n", chessWStr);
+        wchar_t boardWStr[1024];
+        getBoardWStr(boardWStr, &board);
+#ifdef DEBUGTESTBOARD
+        wprintf(L"%ls\n", boardWStr);
+#endif
+
+#ifdef DEBUGTESTBOARD
+        U64 zobrist = getZobristFromBoard(&board);
+        printf("getZobristFromBoard: %016lX\n", zobrist);
+#endif
     }
 }

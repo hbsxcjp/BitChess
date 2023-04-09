@@ -19,7 +19,8 @@
 			"*.tcc": "c",
 			"math.h": "c",
 			"cmath": "c",
-			"cstdlib": "c"
+			"cstdlib": "c",
+			"types.h": "c"
 		}
 	}
 }

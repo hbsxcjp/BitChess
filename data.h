@@ -2,6 +2,7 @@
 #define DATA_H
 
 #include <stdbool.h>
+#include <sys/types.h>
 #include <wchar.h>
 
 #define COLORNUM 2
@@ -14,8 +15,8 @@
 
 #define BOARDBITSIZE 128
 #define BOARDOTHERSIZE (BOARDBITSIZE - BOARDLENGTH)
-#define BOARDAT(i) ((Board)1 << (i))
-#define BOARDFROM(i, offset) ((Board)(i) << (offset))
+#define BOARDAT(i) ((BitBoard)1 << (i))
+#define BOARDFROM(i, offset) ((BitBoard)(i) << (offset))
 
 #define INTBITAT(i) (1 << (i))
 #define INTBITHAS(state, index) ((state)&INTBITAT(index))
@@ -25,7 +26,7 @@
 #define COLSTATEMAX (1 << BOARDROWNUM)
 #define ROWBASEOFFSET(row) ((row)*BOARDCOLNUM)
 #define COLBASEOFFSET(col) ((col)*BOARDROWNUM)
-// #define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
+#define INDEXFROMROWCOL(row, col) ((row)*BOARDCOLNUM + (col))
 
 #define BINARYPATTERN9 "%c%c%c%c%c%c%c%c%c "
 #define BINARYPATTERN10 ("%c" BINARYPATTERN9)
@@ -44,15 +45,20 @@
     BYTEBINARY9(i),     \
         (((i)&0x200) ? '1' : '-')
 
-typedef __uint128_t Board; // 只使用最低的90位
+#define INFOSIZE 32
+#define INFOFIELDNUM 2
+#define REMARKSIZE 1024
+#define MOVESTRSIZE (4 * 4096)
 
-typedef int (*GetIndexFunc)(Board);
+typedef __uint128_t BitBoard; // 只使用最低的90位
+
+typedef __uint64_t U64; // Zobrist键值
+
+typedef int (*GetIndexFunc)(BitBoard);
 
 typedef enum Color {
     RED,
     BLACK,
-    ALLCOLOR,
-    ROTATE,
     NONCOLOR
 } Color;
 
@@ -67,43 +73,96 @@ typedef enum Kind {
     NONKIND
 } Kind;
 
+// 棋盘变换类型
+typedef enum {
+    EXCHANGE,
+    ROTATE,
+    SYMMETRY
+} ChangeType;
+
+// 棋局存储类型
+typedef enum RecFormat {
+    XQF,
+    PGN_ICCS,
+    PGN_ZH,
+    PGN_CC,
+    BIN,
+    JSON
+} RecFormat;
+
 typedef struct Coord {
     int row;
     int col;
 } Coord;
 
-typedef struct ChessPosition {
-    // 当前
-    Color player;
-
+typedef struct Board {
     // 基本局面
-    Board pieces[COLORNUM][KINDNUM];
+    Color player;
+    BitBoard pieces[COLORNUM][KINDNUM];
 
     // 计算中间存储数据(基本局面改动时更新)
     Color bottomColor;
-    Board calPieces[NONCOLOR];
+    BitBoard colorPieces[COLORNUM];
+    BitBoard allPieces;
+    BitBoard rotatePieces;
+} Board;
 
-} ChessPosition;
-
-typedef struct Move {
+typedef struct BitMove {
     Color color;
     Kind kind;
     int index;
 
-    Board moveTo;
+    BitBoard moveTo;
+} BitMove;
+
+typedef struct Move {
+    Color color;
+    Kind kind;
+    int fromIndex;
+    int toIndex;
+
+    struct Move* front;
+    struct Move* next;
+    struct Move* other;
+
+    wchar_t* remark;
 } Move;
+
+typedef struct Instance {
+    Board* board;
+    Move* root;
+    Move* current;
+
+    int infoCount;
+    wchar_t* info[INFOSIZE][INFOFIELDNUM];
+} Instance;
 
 extern const char Chars[COLORNUM][KINDNUM];
 extern const wchar_t Names[COLORNUM][KINDNUM];
+extern const wchar_t NumChar[COLORNUM][BOARDCOLNUM];
+extern const wchar_t PreChar[];
+extern const wchar_t MoveChar[];
+extern const wchar_t IccsChar[];
+
+extern const char NullChar;
+extern const char SplitChar;
+extern const char EndChar;
+extern const char FEN[];
 
 extern Coord Coords[BOARDLENGTH];
 extern int Rotate[BOARDLENGTH];
 
-extern Board BoardMask[BOARDLENGTH];
+extern BitBoard BoardMask[BOARDLENGTH];
 
-extern Board KingMove[BOARDLENGTH];
-extern Board AdvisorMove[BOARDLENGTH];
-extern Board PawnMove[BOARDLENGTH][2];
+extern BitBoard KingMove[BOARDLENGTH];
+extern BitBoard AdvisorMove[BOARDLENGTH];
+extern BitBoard PawnMove[BOARDLENGTH][2];
+
+// 生成Zobrist键所需的随机值
+extern U64 ZobristBlack;
+extern U64 Zobrist[COLORNUM][KINDNUM][BOARDLENGTH];
+
+int code_convert(char* from_charset, char* to_charset, char* inbuf, size_t inlen, char* outbuf, size_t outlen);
 
 // 获取非0位的索引位置
 // unsigned int getLowNonZeroIndexFromUInt(unsigned int value);
@@ -112,51 +171,32 @@ extern Board PawnMove[BOARDLENGTH][2];
 
 // int getLowNonZeroIndexs(int indexs[], int value);
 
-// int getLowNonZeroIndex(Board board);
+int getLowNonZeroIndex(BitBoard bitBoard);
 
-// int getHighNonZeroIndex(Board board);
+// int getHighNonZeroIndex(BitBoard bitBoard);
 
-GetIndexFunc getNonZeroIndex(ChessPosition* chess, Color color);
+GetIndexFunc getNonZeroIndex(Board* board, Color color);
 
 // 获取某种棋子在当前状态某个位置可移动的位棋盘
-// Board getKingMove(int fromIndex);return KingMove[fromIndex];
+// BitBoard getKingMove(int fromIndex);return KingMove[fromIndex];
 
-// Board getAdvisorMove(int fromIndex);return AdvisorMove[fromIndex];
+// BitBoard getAdvisorMove(int fromIndex);return AdvisorMove[fromIndex];
 
-Board getBishopMove(int fromIndex, Board allPieces);
+BitBoard getBishopMove(int fromIndex, BitBoard allPieces);
 
-Board getKnightMove(int fromIndex, Board allPieces);
+BitBoard getKnightMove(int fromIndex, BitBoard allPieces);
 
-Board getRookMove(int fromIndex, Board allPieces, Board rotatePieces);
+BitBoard getRookMove(int fromIndex, BitBoard allPieces, BitBoard rotatePieces);
 
-Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces);
+BitBoard getCannonMove(int fromIndex, BitBoard allPieces, BitBoard rotatePieces);
 
-// Board getPawnMove(int fromIndex, bool isBottom);return PawnMove[fromIndex][isBottom];
+// BitBoard getPawnMove(int fromIndex, bool isBottom);return PawnMove[fromIndex][isBottom];
 
-// 清除原位置，置位新位置
-void turnColorKindPieces(ChessPosition* chess, Color color, Kind kind, Board turnBoard, Board rotateTurnBoard);
+char* getBitStr(char* bitStr, int value, bool isRotate);
 
-void traverseColorKindPieces(ChessPosition* chess, Color color, Kind kind, GetIndexFunc getIndexFunc, Board board,
-    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
-    void* arg1, void* arg2);
+void getBitBoardStr(char boardStr[][16], BitBoard bitBoard, bool isRotate);
 
-void traverseColorPieces(ChessPosition* chess, Color color,
-    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
-    void* arg1, void* arg2);
-
-void traverseAllColorPieces(ChessPosition* chess,
-    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
-    void* arg1, void* arg2);
-
-bool isEqual(ChessPosition achess, ChessPosition bchess);
-
-char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int colNum, bool showZero, bool isRotate);
-
-char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int colNum);
-
-char* getChessPositionStr(char* chessStr, ChessPosition* chess);
-
-wchar_t* getChessPositionWStr(wchar_t* chessStr, ChessPosition* chess);
+char* getBitBoardArrayStr(char* boardArrayStr, const BitBoard* boards, int length, int colNum, bool showZero, bool isRotate);
 
 // 初始化预计算的数据
 void initData();

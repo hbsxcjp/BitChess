@@ -1,10 +1,14 @@
 #include "data.h"
 #include <ctype.h>
+#include <iconv.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
+// #define DEBUGZOBRIST
 // #define DEBUGBASEDATA
+
 // #define DEBUGKING
 // #define DEBUGADVISOR
 // #define DEBUGBISHOP
@@ -13,36 +17,74 @@
 // #define DEBUGROOKCANNON2
 // #define DEBUGPAWN
 
-const char Chars[COLORNUM][KINDNUM] = { "KABNRCP", "kabnrcp" };
+const char Chars[COLORNUM][KINDNUM]
+    = { "KABNRCP", "kabnrcp" };
 
 const wchar_t Names[COLORNUM][KINDNUM] = { L"帅仕相马车炮兵", L"将士象马车炮卒" };
 
-// static const wchar_t NumChar[COLORNUM][BOARDCOLNUM] = { L"一二三四五六七八九", L"１２３４５６７８９" };
+const wchar_t NumChar[COLORNUM][BOARDCOLNUM] = { L"一二三四五六七八九", L"１２３４５６７８９" };
 
-// static const wchar_t PreChar[] = L"前中后";
+const wchar_t PreChar[] = L"前中后";
 
-// static const wchar_t MoveChar[] = L"退平进";
+const wchar_t MoveChar[] = L"退平进";
+
+const wchar_t IccsChar[] = L"abcdefghi";
+
+const char NullChar = '_';
+
+const char SplitChar = '/';
+
+const char EndChar = '\x0';
+
+const char FEN[] = "rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR";
 
 Coord Coords[BOARDLENGTH];
 int Rotate[BOARDLENGTH];
-Board BoardMask[BOARDLENGTH];
+BitBoard BoardMask[BOARDLENGTH];
 
 // 帅仕根据所处的位置选取可移动位棋盘
-Board KingMove[BOARDLENGTH];
-Board AdvisorMove[BOARDLENGTH];
+BitBoard KingMove[BOARDLENGTH];
+BitBoard AdvisorMove[BOARDLENGTH];
 
 // 马相根据憋马腿或田心组成的四个位置状态选取可移动位棋盘
-static Board BishopMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
-static Board KnightMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
+static BitBoard BishopMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
+static BitBoard KnightMove[BOARDLENGTH][INTBITAT(LEGCOUNT)];
 
 // 车炮根据每行和每列的位置状态选取可移动位棋盘
-static Board RookRowMove[BOARDCOLNUM][ROWSTATEMAX];
-static Board RookColMove[BOARDROWNUM][COLSTATEMAX];
-static Board CannonRowMove[BOARDCOLNUM][ROWSTATEMAX];
-static Board CannonColMove[BOARDROWNUM][COLSTATEMAX];
+static BitBoard RookRowMove[BOARDCOLNUM][ROWSTATEMAX];
+static BitBoard RookColMove[BOARDROWNUM][COLSTATEMAX];
+static BitBoard CannonRowMove[BOARDCOLNUM][ROWSTATEMAX];
+static BitBoard CannonColMove[BOARDROWNUM][COLSTATEMAX];
 
 // 兵根据本方处于上或下的二个位置状态选取可移动位棋盘
-Board PawnMove[BOARDLENGTH][2];
+BitBoard PawnMove[BOARDLENGTH][2];
+
+U64 ZobristBlack;
+U64 Zobrist[COLORNUM][KINDNUM][BOARDLENGTH];
+
+int code_convert(char* from_charset, char* to_charset, char* inbuf, size_t inlen, char* outbuf, size_t outlen)
+{
+    iconv_t cd;
+    // int rc;
+    char** pin = &inbuf;
+    char** pout = &outbuf;
+    cd = iconv_open(to_charset, from_charset);
+
+    if (cd == 0)
+        return -1;
+
+    memset(outbuf, 0, outlen);
+    if (iconv(cd, pin, &inlen, pout, &outlen) == -1)
+        return -1;
+
+    iconv_close(cd);
+    return 0;
+}
+
+static U64 rand64()
+{
+    return rand() ^ ((U64)rand() << 15) ^ ((U64)rand() << 30) ^ ((U64)rand() << 45) ^ ((U64)rand() << 60);
+}
 
 // 通过二分搜索计算右侧的连续零位（尾随）
 unsigned int getLowNonZeroIndexFromUInt(unsigned int value)
@@ -120,14 +162,14 @@ int getLowNonZeroIndexs(int indexs[], int value)
 }
 
 // 求最低位非零位的序号，调用前判断参数非零
-int getLowNonZeroIndex(Board board)
+int getLowNonZeroIndex(BitBoard bitBoard)
 {
     int index = BOARDBITSIZE - 1;
-    uint64_t value = board & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
+    uint64_t value = bitBoard & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
     if (value)
         index -= 64;
     else
-        value = board >> 64; // 64-89 位
+        value = bitBoard >> 64; // 64-89 位
 
     if (value & 0X00000000FFFFFFFFUL) {
         index -= 32;
@@ -161,14 +203,14 @@ int getLowNonZeroIndex(Board board)
 }
 
 // 求最高位非零位的序号，调用前判断参数非全零位
-int getHighNonZeroIndex(Board board)
+int getHighNonZeroIndex(BitBoard bitBoard)
 {
     int index = 0;
-    uint64_t value = board >> 64; // 64-89 位
+    uint64_t value = bitBoard >> 64; // 64-89 位
     if (value)
         index += 64;
     else
-        value = board & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
+        value = bitBoard & 0XFFFFFFFFFFFFFFFFUL; // 00-63 位
 
     if (value & 0XFFFFFFFF00000000UL) {
         index += 32;
@@ -201,22 +243,9 @@ int getHighNonZeroIndex(Board board)
     return index;
 }
 
-GetIndexFunc getNonZeroIndex(ChessPosition* chess, Color color)
+GetIndexFunc getNonZeroIndex(Board* board, Color color)
 {
-    return color == chess->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
-}
-
-int getBoardNonZeroIndexs(int indexs[], Board board)
-{
-    int count = 0;
-    while (board) {
-        int index = getLowNonZeroIndex(board);
-        indexs[count++] = index;
-
-        board ^= BOARDAT(index);
-    }
-
-    return count;
+    return color == board->bottomColor ? getHighNonZeroIndex : getLowNonZeroIndex;
 }
 
 static bool isValidKing(int row, int col)
@@ -240,6 +269,34 @@ static bool isValidPawn(int row, int col, bool isBottom)
 {
     return (isBottom ? (row < 5 || ((row == 5 || row == 6) && (col == 0 || col == 2 || col == 4 || col == 6 || col == 8)))
                      : (row > 4 || ((row == 3 || row == 4) && (col == 0 || col == 2 || col == 4 || col == 6 || col == 8))));
+}
+
+static void initZobrist()
+{
+    ZobristBlack = rand64();
+    for (Color color = RED; color <= BLACK; ++color) {
+#ifdef DEBUGZOBRIST
+        printf("Color:%d\n", color);
+#endif
+        for (Kind kind = KING; kind <= PAWN; ++kind) {
+#ifdef DEBUGZOBRIST
+            printf("Kind:%d\n", kind);
+#endif
+            for (int index = 0; index < BOARDLENGTH; ++index) {
+                Zobrist[color][kind][index] = rand64();
+
+#ifdef DEBUGZOBRIST
+                printf("%016lX\t", Zobrist[color][kind][index]);
+#endif
+            }
+#ifdef DEBUGZOBRIST
+            printf("\n");
+#endif
+        }
+#ifdef DEBUGZOBRIST
+        printf("\n");
+#endif
+    }
 }
 
 static void initBaseData()
@@ -275,7 +332,7 @@ static void initBaseData()
     }
     printf("%s\n", boardStr);
 
-    getBoardArrayStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, true, false);
+    getBitBoardArrayStr(boardStr, BoardMask, BOARDLENGTH, BOARDCOLNUM, true, false);
     printf("testBoardMask:\n%s\n", boardStr);
 #endif
 }
@@ -288,7 +345,7 @@ static void initKingMove()
         if (!isValidKing(row, col))
             continue;
 
-        Board match = 0;
+        BitBoard match = 0;
         if (col > 3)
             match |= BoardMask[index - 1];
         if (col < 5)
@@ -304,7 +361,7 @@ static void initKingMove()
     printf("printKingMove:\n");
 
     char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
-    getBoardArrayStr(boardStr, KingMove, BOARDLENGTH, 9, false, false);
+    getBitBoardArrayStr(boardStr, KingMove, BOARDLENGTH, 9, false, false);
     printf("%s\n", boardStr);
 #endif
 }
@@ -317,7 +374,7 @@ static void initAdvisorMove()
         if (!isValidAdvisor(row, col))
             continue;
 
-        Board match;
+        BitBoard match;
         if (col == 4)
             match = (BoardMask[index - BOARDCOLNUM - 1]
                 | BoardMask[index - BOARDCOLNUM + 1]
@@ -332,7 +389,7 @@ static void initAdvisorMove()
     printf("printAdvisorMove:\n");
 
     char boardStr[BOARDLENGTH * (BOARDROWNUM + 2) * 16];
-    getBoardArrayStr(boardStr, AdvisorMove, BOARDLENGTH, 5, false, false);
+    getBitBoardArrayStr(boardStr, AdvisorMove, BOARDLENGTH, 5, false, false);
     printf("%s\n", boardStr);
 #endif
 }
@@ -356,7 +413,7 @@ static void initBishopMove()
             else if (col == BOARDCOLNUM - 1)
                 realState |= (INTBITAT(LEGCOUNT - 2) | INTBITAT(LEGCOUNT - 4));
 
-            Board match = 0;
+            BitBoard match = 0;
             if (!(realState & INTBITAT(LEGCOUNT - 1)))
                 match |= BoardMask[index - 2 * BOARDCOLNUM - 2];
 
@@ -376,7 +433,7 @@ static void initBishopMove()
         printf("printBishopMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
 
         char boardStr[INTBITAT(LEGCOUNT) * (BOARDROWNUM + 2) * 16];
-        getBoardArrayStr(boardStr, BishopMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
+        getBitBoardArrayStr(boardStr, BishopMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
         printf("%s\n", boardStr);
 #endif
     }
@@ -398,7 +455,7 @@ static void initKninghtCanMove()
             else if (col == BOARDCOLNUM - 1)
                 realState |= INTBITAT(LEGCOUNT - 3);
 
-            Board match = 0;
+            BitBoard match = 0;
             if (!(realState & INTBITAT(LEGCOUNT - 1)) && row > 1) {
                 if (col > 0)
                     match |= BoardMask[index - 2 * BOARDCOLNUM - 1];
@@ -431,7 +488,7 @@ static void initKninghtCanMove()
         printf("printKnightMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
 
         char boardStr[INTBITAT(LEGCOUNT) * (BOARDROWNUM + 2) * 16];
-        getBoardArrayStr(boardStr, KnightMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
+        getBitBoardArrayStr(boardStr, KnightMove[index], INTBITAT(LEGCOUNT), INTBITAT(LEGCOUNT - 1), true, false);
         printf("%s\n", boardStr);
 #endif
     }
@@ -477,15 +534,15 @@ static void initRookCannonCanMove()
                 length = isRotate ? BOARDROWNUM : BOARDCOLNUM;
             for (int rowCloIndex = 0; rowCloIndex < length; ++rowCloIndex) {
 #ifdef DEBUGROOKCANNON1
-                char temp[32], temp2[32];
+                char temp1[32], temp2[32];
                 int count = 0;
                 printf("printRookCannonCanMove: Format:[state][match] %s, %s: %s\n",
                     isCannon ? "Cannon" : "Rook",
                     isRotate ? "Col" : "Row",
-                    getBitStr(temp, INTBITAT(rowCloIndex), isRotate));
+                    getBitStr(temp1, INTBITAT(rowCloIndex), isRotate));
 #endif
 
-                Board* moveMatchs = (isCannon
+                BitBoard* moveMatchs = (isCannon
                         ? (isRotate ? CannonColMove[rowCloIndex] : CannonRowMove[rowCloIndex])
                         : (isRotate ? RookColMove[rowCloIndex] : RookRowMove[rowCloIndex]));
                 for (int state = 0; state < stateTotal; ++state) {
@@ -500,7 +557,7 @@ static void initRookCannonCanMove()
                     }
 
                     if (isRotate) {
-                        Board colMatch = 0;
+                        BitBoard colMatch = 0;
                         for (int row = 0; row < BOARDROWNUM; ++row) {
                             if (match & INTBITAT(row))
                                 colMatch |= BoardMask[ROWBASEOFFSET(row)]; // 每行的首列置位
@@ -509,7 +566,7 @@ static void initRookCannonCanMove()
                     } else
                         moveMatchs[state] = match;
 #ifdef DEBUGROOKCANNON1
-                    printf("%s %s", getBitStr(temp, state, isRotate), getBitStr(temp2, match, isRotate));
+                    printf("%s %s", getBitStr(temp1, state, isRotate), getBitStr(temp2, match, isRotate));
                     if (count % 5 == 4)
                         printf("\n");
                     else if (count != (stateTotal >> 1) - 1)
@@ -529,7 +586,7 @@ static void initRookCannonCanMove()
                     getBitStr(temp, INTBITAT(rowCloIndex), isRotate));
 
                 char boardStr[stateTotal * (BOARDROWNUM + 2) * 16];
-                getBoardArrayStr(boardStr, moveMatchs, stateTotal, BOARDCOLNUM, false, false);
+                getBitBoardArrayStr(boardStr, moveMatchs, stateTotal, BOARDCOLNUM, false, false);
                 printf("%s\n", boardStr);
 #endif
             }
@@ -547,7 +604,7 @@ static void initPawnMove()
             if (!isValidPawn(row, col, isBottom))
                 continue;
 
-            Board match = 0;
+            BitBoard match = 0;
             if ((isBottom == 0 && row > 4) || (isBottom == 1 && row < 5)) {
                 if (col != 0)
                     match |= BoardMask[index - 1];
@@ -566,13 +623,13 @@ static void initPawnMove()
         printf("printPawnMove: fromIndex:%2d (%2d,%2d)\n", index, row, col);
 
         char boardStr[2 * (BOARDROWNUM + 2) * 16];
-        getBoardArrayStr(boardStr, PawnMove[index], 2, 2, true, false);
+        getBitBoardArrayStr(boardStr, PawnMove[index], 2, 2, true, false);
         printf("%s\n", boardStr);
 #endif
     }
 }
 
-Board getBishopMove(int fromIndex, Board allPieces)
+BitBoard getBishopMove(int fromIndex, BitBoard allPieces)
 {
     Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
@@ -588,7 +645,7 @@ Board getBishopMove(int fromIndex, Board allPieces)
     return BishopMove[fromIndex][state];
 }
 
-Board getKnightMove(int fromIndex, Board allPieces)
+BitBoard getKnightMove(int fromIndex, BitBoard allPieces)
 {
     Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col;
@@ -600,7 +657,7 @@ Board getKnightMove(int fromIndex, Board allPieces)
     return KnightMove[fromIndex][state];
 }
 
-Board getRookMove(int fromIndex, Board allPieces, Board rotatePieces)
+BitBoard getRookMove(int fromIndex, BitBoard allPieces, BitBoard rotatePieces)
 {
     Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col,
@@ -610,7 +667,7 @@ Board getRookMove(int fromIndex, Board allPieces, Board rotatePieces)
         | (RookColMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
 }
 
-Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces)
+BitBoard getCannonMove(int fromIndex, BitBoard allPieces, BitBoard rotatePieces)
 {
     Coord fromSeat = Coords[fromIndex];
     int row = fromSeat.row, col = fromSeat.col,
@@ -620,69 +677,7 @@ Board getCannonMove(int fromIndex, Board allPieces, Board rotatePieces)
         | (CannonColMove[row][(rotatePieces >> COLBASEOFFSET(col)) & 0x3FF] << col)); // 每行首列置位全体移动数列
 }
 
-void turnColorKindPieces(ChessPosition* chess, Color color, Kind kind, Board turnBoard, Board rotateTurnBoard)
-{
-    chess->pieces[color][kind] ^= turnBoard;
-
-    chess->calPieces[color] ^= turnBoard;
-    chess->calPieces[ALLCOLOR] ^= turnBoard;
-    chess->calPieces[ROTATE] ^= rotateTurnBoard;
-}
-
-void traverseColorKindPieces(ChessPosition* chess, Color color, Kind kind, GetIndexFunc getIndexFunc, Board board,
-    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
-    void* arg1, void* arg2)
-{
-    while (board) {
-        int index = getIndexFunc(board);
-        // 执行针对遍历元素的操作函数
-        func(chess, color, kind, index, arg1, arg2);
-
-        board ^= BoardMask[index];
-    }
-}
-
-void traverseColorPieces(ChessPosition* chess, Color color,
-    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
-    void* arg1, void* arg2)
-{
-    GetIndexFunc getIndexFunc = getNonZeroIndex(chess, color);
-    for (Kind kind = KING; kind <= PAWN; ++kind)
-        traverseColorKindPieces(chess, color, kind, getIndexFunc, chess->pieces[color][kind],
-            func, arg1, arg2);
-}
-
-void traverseAllColorPieces(ChessPosition* chess,
-    void func(ChessPosition* chess, Color color, Kind kind, int index, void* arg1, void* arg2),
-    void* arg1, void* arg2)
-{
-    for (Color color = RED; color <= BLACK; ++color)
-        traverseColorPieces(chess, color, func, arg1, arg2);
-}
-
-bool isEqual(ChessPosition achess, ChessPosition bchess)
-{
-    if (achess.player != bchess.player)
-        return false;
-
-    for (Color color = RED; color <= BLACK; color++) {
-        for (Kind kind = KING; kind < NONKIND; kind++)
-            if (achess.pieces[color][kind] != bchess.pieces[color][kind])
-                return false;
-    }
-
-    if (achess.bottomColor != bchess.bottomColor)
-        return false;
-
-    for (Color color = RED; color < NONCOLOR; color++) {
-        if (achess.calPieces[color] != bchess.calPieces[color])
-            return false;
-    }
-
-    return true;
-}
-
-static char* getBitStr(char* bitStr, int value, bool isRotate)
+char* getBitStr(char* bitStr, int value, bool isRotate)
 {
     if (isRotate)
         snprintf(bitStr, 64, BINARYPATTERN10, BYTEBINARY10(value));
@@ -692,15 +687,15 @@ static char* getBitStr(char* bitStr, int value, bool isRotate)
     return bitStr;
 }
 
-static void getBoardStr(char boardStr[][16], Board board, bool isRotate)
+void getBitBoardStr(char boardStr[][16], BitBoard bitBoard, bool isRotate)
 {
     int rowNum = isRotate ? BOARDCOLNUM : BOARDROWNUM,
         mode = isRotate ? 0x3FF : 0x1FF;
     for (int row = 0; row < rowNum; ++row)
-        getBitStr(boardStr[row], (board >> (isRotate ? COLBASEOFFSET(row) : ROWBASEOFFSET(row))) & mode, isRotate);
+        getBitStr(boardStr[row], (bitBoard >> (isRotate ? COLBASEOFFSET(row) : ROWBASEOFFSET(row))) & mode, isRotate);
 }
 
-char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int colNum, bool showZero, bool isRotate)
+char* getBitBoardArrayStr(char* boardArrayStr, const BitBoard* boards, int length, int colNum, bool showZero, bool isRotate)
 {
     if (length < colNum)
         colNum = length;
@@ -714,7 +709,7 @@ char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int
     strcat(nullRowStr, "\n");
 
     strcpy(boardArrayStr, "");
-    Board nonZeroBoards[length];
+    BitBoard nonZeroBoards[length];
     if (!showZero) {
         int count = 0;
         for (int index = 0; index < length; ++index) {
@@ -731,7 +726,7 @@ char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int
             snprintf(temp, 64, "%02d(%d,%d):  ", index + col, (index + col) / colNum, col);
             strcat(indexRowStr, temp);
 
-            getBoardStr(boardStr[col], boards[index + col], isRotate);
+            getBitBoardStr(boardStr[col], boards[index + col], isRotate);
         }
         strcat(indexRowStr, "\n");
         strcat(boardArrayStr, indexRowStr);
@@ -753,140 +748,9 @@ char* getBoardArrayStr(char* boardArrayStr, const Board* boards, int length, int
     return boardArrayStr;
 }
 
-char* getMoveArrayStr(char* moveArrayStr, const Move* moves, int length, int colNum)
-{
-    if (length < colNum)
-        colNum = length;
-
-    char temp[64],
-        nullRowStr[colNum * 16];
-    strcpy(nullRowStr, "   ");
-    for (int col = 0; col < colNum; ++col)
-        strcat(nullRowStr, "ABCDEFGHI ");
-    strcat(nullRowStr, "\n");
-
-    strcpy(moveArrayStr, "");
-    for (int index = 0; index < length; index += colNum) {
-        char boardStr[colNum][BOARDROWNUM][16];
-        strcat(moveArrayStr, "   ");
-        for (int col = 0; col < colNum && index + col < length; ++col) {
-            Move move = moves[index + col];
-            snprintf(temp, 64, "%c %02d      ", Chars[move.color][move.kind], move.index);
-            strcat(moveArrayStr, temp);
-
-            getBoardStr(boardStr[col], move.moveTo, false);
-        }
-        strcat(moveArrayStr, "\n");
-        strcat(moveArrayStr, nullRowStr);
-
-        for (int row = 0; row < BOARDROWNUM; ++row) {
-            snprintf(temp, 16, "%d: ", row);
-            strcat(moveArrayStr, temp);
-            for (int col = 0; col < colNum && index + col < length; ++col)
-                strcat(moveArrayStr, boardStr[col][row]);
-
-            strcat(moveArrayStr, "\n");
-        }
-    }
-
-    for (int index = 0; index < length; ++index) {
-        Move move = moves[index];
-        Coord coord = Coords[move.index];
-        snprintf(temp, 64, "[%c] from:(%02d,%02d) to:", Chars[move.color][move.kind], coord.row, coord.col);
-        strcat(moveArrayStr, temp);
-
-        int indexs[BOARDROWNUM + BOARDCOLNUM];
-        int count = getBoardNonZeroIndexs(indexs, move.moveTo);
-        for (int i = 0; i < count; ++i) {
-            Coord coord = Coords[indexs[i]];
-            snprintf(temp, 64, "(%02d,%02d) ", coord.row, coord.col);
-            strcat(moveArrayStr, temp);
-        }
-
-        strcat(moveArrayStr, "\n");
-    }
-
-    return moveArrayStr;
-}
-
-static void setBoardChars(ChessPosition* chess, Color color, Kind kind, int index, void* boardStr, void* arg2)
-{
-    Coord coord = Coords[index];
-    ((char*)boardStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Chars[color][kind];
-}
-
-char* getChessPositionStr(char* chessStr, ChessPosition* chess)
-{
-    static const char* BoardStr = "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n"
-                                  "---------\n";
-
-    const char* colorStrs[] = { "RED", "BLACK" };
-    char temp[KINDNUM * (BOARDROWNUM + 2) * 16];
-    snprintf(temp, 128, "player: %s\n", colorStrs[chess->player]);
-    strcpy(chessStr, temp);
-    for (Color color = RED; color <= BLACK; ++color) {
-        snprintf(temp, 32, "chess->pieces[%s][Kind]:\n", colorStrs[!color]);
-        strcat(chessStr, temp);
-
-        getBoardArrayStr(temp, chess->pieces[!color], KINDNUM, KINDNUM, true, false);
-        strcat(chessStr, temp);
-    }
-
-    snprintf(temp, 128, "calPieces[Color]: \nRED:         BLACK:    ALLCOLOR:\n");
-    strcat(chessStr, temp);
-    getBoardArrayStr(temp, chess->calPieces, ALLCOLOR + 1, KINDNUM, true, false);
-    strcat(chessStr, temp);
-
-    strcat(chessStr, "ROTATE: \n");
-    getBoardArrayStr(temp, &chess->calPieces[ROTATE], 1, KINDNUM, true, true);
-    strcat(chessStr, temp);
-
-    strcat(chessStr, "chessBoardStr:\n");
-    strcpy(temp, BoardStr);
-    traverseAllColorPieces(chess, setBoardChars, temp, NULL);
-    strcat(chessStr, temp);
-
-    return chessStr;
-}
-
-static void setBoardNames(ChessPosition* chess, Color color, Kind kind, int index, void* boardWStr, void* arg2)
-{
-    Coord coord = Coords[index];
-    ((wchar_t*)boardWStr)[coord.row * (BOARDCOLNUM + 1) + coord.col] = Names[color][kind];
-}
-
-wchar_t* getChessPositionWStr(wchar_t* chessStr, ChessPosition* chess)
-{
-    static const wchar_t* BoardStr = L"－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n"
-                                     "－－－－－－－－－\n";
-
-    wchar_t temp[KINDNUM * (BOARDROWNUM + 2) * 16];
-    wcscpy(chessStr, L"chessBoardWStr:\n");
-    wcscpy(temp, BoardStr);
-    traverseAllColorPieces(chess, setBoardNames, temp, NULL);
-    wcscat(chessStr, temp);
-
-    return chessStr;
-}
-
 void initData()
 {
+    initZobrist();
     initBaseData();
 
     initKingMove();
